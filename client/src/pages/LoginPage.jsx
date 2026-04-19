@@ -105,7 +105,7 @@ export default function LoginPage() {
         <div className="mt-4 glass-card p-4">
           <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wider">Demo Credentials</p>
           <div className="grid grid-cols-2 gap-2 text-xs text-text-secondary">
-            <button onClick={() => setForm({ email: 'admin@lifenet.com', password: 'admin123' })} className="text-left p-1.5 rounded-lg hover:bg-bg-hover transition-colors">
+            <button onClick={() => setForm({ email: 'admin@lifenet.com', password: 'admin' })} className="text-left p-1.5 rounded-lg hover:bg-bg-hover transition-colors">
               <span className="badge badge-danger text-[10px]">Admin</span>
             </button>
             <button onClick={() => setForm({ email: 'hospital@lifenet.com', password: 'hospital123' })} className="text-left p-1.5 rounded-lg hover:bg-bg-hover transition-colors">

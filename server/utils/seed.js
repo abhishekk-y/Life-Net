@@ -30,7 +30,7 @@ const seedData = async () => {
       {
         name: 'Admin User',
         email: 'admin@lifenet.com',
-        password: 'admin123',
+        password: 'admin',
         role: 'ADMIN',
         organization: 'LifeNet Central',
         phone: '+91-9876543210',
@@ -206,7 +206,7 @@ const seedData = async () => {
     logger.info('');
     logger.info('📝 Login Credentials:');
     logger.info('───────────────────────────────');
-    logger.info('Admin:       admin@lifenet.com / admin123');
+    logger.info('Admin:       admin@lifenet.com / admin');
     logger.info('Hospital:    hospital@lifenet.com / hospital123');
     logger.info('Blood Bank:  bloodbank@lifenet.com / bloodbank123');
     logger.info('Procurement: procurement@lifenet.com / procurement123');

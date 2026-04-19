@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: 6,
+      minlength: 4,
       select: false, // Never return password by default
     },
     role: {
@@ -69,7 +69,7 @@ const userSchema = new mongoose.Schema(
 
 // Index for geospatial queries
 userSchema.index({ location: '2dsphere' });
-userSchema.index({ email: 1 });
+
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
