@@ -9,6 +9,19 @@ A production-grade, real-time healthcare emergency platform that connects hospit
 
 ---
 
+## 📸 Screenshots
+
+### Central Dashboard
+![Dashboard](docs/assets/dashboard_real_data_1776640556661.png)
+
+### Organs Registry & Live Tracking
+![Organs](docs/assets/organs_page_real_data_1776640567343.png)
+
+### Secure Portal Access
+![Login](docs/assets/initial_state_1776640525322.png)
+
+---
+
 ## 🎯 Features
 
 ### Core
