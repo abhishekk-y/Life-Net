@@ -74,30 +74,6 @@ const steps = [
   { num: "04", title: "Track to Completion", desc: "Full audit trail from procurement to transplant. Every action logged for compliance and accountability." },
 ];
 
-const testimonials = [
-  {
-    name: "Dr. Rajesh Sharma",
-    role: "Head of Transplant, AIIMS New Delhi",
-    content: "LifeNet cut our organ coordination time from 8 hours to under 45 minutes. The viability tracking alone has saved multiple hearts that would have been lost.",
-    initials: "RS",
-    color: "bg-blue-600",
-  },
-  {
-    name: "Dr. Priya Nair",
-    role: "Transplant Coordinator, Apollo Chennai",
-    content: "The real-time matching considering HLA and blood group simultaneously — something that used to take our team a full day now happens instantly.",
-    initials: "PN",
-    color: "bg-rose-600",
-  },
-  {
-    name: "Dr. Anil Kumar",
-    role: "Director, Red Cross Blood Bank Bangalore",
-    content: "Managing 40+ blood units across 8 groups was a nightmare with spreadsheets. LifeNet gives us instant visibility and expiry alerts that actually work.",
-    initials: "AK",
-    color: "bg-emerald-600",
-  },
-];
-
 const urgencyItems = [
   { type: "HEART", blood: "O+", city: "Delhi", time: "3h left", urgent: true },
   { type: "KIDNEY", blood: "A+", city: "Chennai", time: "18h left", urgent: false },
@@ -129,7 +105,7 @@ export function Landing() {
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              {["Features", "How it Works", "Testimonials"].map(l => (
+              {["Features", "How it Works"].map(l => (
                 <a key={l} href={`#${l.toLowerCase().replace(/ /g,"-")}`}
                   className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">
                   {l}
@@ -306,40 +282,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section id="testimonials" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <Badge className="mb-4 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-full">Testimonials</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">Trusted Across India</h2>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">What transplant coordinators and blood bank directors are saying</p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map(t => (
-              <Card key={t.name} className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <span key={i} className="text-amber-400 text-sm">★</span>
-                    ))}
-                  </div>
-                  <p className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed text-sm">"{t.content}"</p>
-                  <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <div className={`w-10 h-10 ${t.color} rounded-full flex items-center justify-center text-white font-bold text-xs`}>
-                      {t.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">{t.name}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">{t.role}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── CTA ── */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">

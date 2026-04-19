@@ -291,51 +291,129 @@ export function Organs() {
 
       {/* Organ Detail Dialog */}
       <Dialog open={!!selectedOrgan} onOpenChange={() => setSelectedOrgan(null)}>
-        <DialogContent className="sm:max-w-[600px] bg-white dark:bg-gray-900 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between text-gray-900 dark:text-white">
-              <span>{selectedOrgan?.organType?.replace(/_/g, " ")} Details</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedOrgan(null)} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
-              </Button>
+        <DialogContent className="sm:max-w-[700px] bg-black border-gray-800 rounded-2xl text-white shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-2xl font-bold tracking-tight">
+              Clinical Organ Profile
             </DialogTitle>
           </DialogHeader>
+          
           {selectedOrgan && (
-            <div className="space-y-4 pt-4">
-              <div className="flex gap-3">
-                <Badge className={statusColors[selectedOrgan.status] || ""}>{selectedOrgan.status}</Badge>
-                <Badge variant="outline" className="font-mono">{selectedOrgan.bloodGroup}</Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-xl">
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Viability Window</p>
-                  <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">{selectedOrgan.viabilityHours}h</p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400">{getViabilityRemaining(selectedOrgan)}</p>
+            <div className="flex flex-col">
+              {/* Header Bar */}
+              <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-800 bg-gray-900/50">
+                <div className="w-16 h-16 rounded-xl bg-blue-900/40 border border-blue-500/30 flex items-center justify-center">
+                  <Heart className="w-8 h-8 text-blue-400" />
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Donor</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedOrgan.donorAge || "N/A"} yrs</p>
-                  <p className="text-xs text-gray-500">{selectedOrgan.donorGender || "N/A"}</p>
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900 dark:text-white">
-                    {selectedOrgan.location?.city || "Unknown"}{selectedOrgan.location?.state ? `, ${selectedOrgan.location.state}` : ""}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-600 dark:text-gray-400">Registered:</span>
-                  <span className="text-gray-900 dark:text-white">{new Date(selectedOrgan.createdAt).toLocaleString()}</span>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-100 flex items-center gap-2">
+                    {selectedOrgan.organType?.replace(/_/g, " ")} 
+                    <Badge variant="outline" className="text-blue-400 border-blue-400/30 bg-blue-950/50 ml-2">
+                       {selectedOrgan.bloodGroup}
+                    </Badge>
+                  </h2>
+                  <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 font-mono">
+                    <span>ID: {selectedOrgan._id}</span>
+                    <span>•</span>
+                    <Badge className={`${statusColors[selectedOrgan.status]} h-5 text-[10px]`}>
+                      {selectedOrgan.status}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              {selectedOrgan.notes && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-amber-50 dark:bg-amber-950 rounded-xl">
-                  {selectedOrgan.notes}
-                </p>
-              )}
+
+              {/* Data Grid */}
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-950">
+                
+                {/* Viability Module */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
+                    <Activity className="w-4 h-4 text-emerald-400" /> Viability Status
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-[50px] rounded-full"></div>
+                    <div className="flex justify-between items-baseline mb-2 relative z-10">
+                      <span className="text-3xl font-mono font-bold text-emerald-400">
+                        {getViabilityRemaining(selectedOrgan)}
+                      </span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        / {selectedOrgan.viabilityHours}H TOTAL
+                      </span>
+                    </div>
+                    <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mt-3">
+                      <div className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: '75%' }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Donor Module */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
+                    <User className="w-4 h-4 text-blue-400" /> Donor Demographics
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 font-mono mb-1">AGE</p>
+                      <p className="text-lg font-bold text-gray-200">{selectedOrgan.donorAge || "N/A"} <span className="text-sm font-normal text-gray-500">YRS</span></p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-mono mb-1">GENDER</p>
+                      <p className="text-lg font-bold text-gray-200">{selectedOrgan.donorGender || "N/A"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logistics Module */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
+                    <MapPin className="w-4 h-4 text-purple-400" /> Procurement Logistics
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 font-mono mb-1">ORIGIN CACHE</p>
+                      <p className="text-sm font-medium text-gray-200">
+                        {selectedOrgan.location?.city || "Unknown"}
+                        {selectedOrgan.location?.state ? `, ${selectedOrgan.location.state}` : ""}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-mono mb-1">HARVEST TIMESTAMP</p>
+                      <p className="text-sm font-medium text-gray-300 font-mono">
+                        {new Date(selectedOrgan.createdAt).toLocaleString('en-IN', { hour12: false })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clinical Notes */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
+                    <Search className="w-4 h-4 text-amber-400" /> Clinical Assessment
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 h-[104px] overflow-y-auto custom-scrollbar">
+                    {selectedOrgan.notes ? (
+                      <p className="text-sm text-amber-200/80 leading-relaxed font-medium">
+                        " {selectedOrgan.notes} "
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-600 italic">No additional clinical notes provided.</p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Bar */}
+              <div className="p-4 border-t border-gray-800 bg-black flex justify-end gap-3">
+                <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800" onClick={() => setSelectedOrgan(null)}>
+                  Close Profile
+                </Button>
+                {selectedOrgan.status === 'AVAILABLE' && (
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                    Initiate Procurement Match
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

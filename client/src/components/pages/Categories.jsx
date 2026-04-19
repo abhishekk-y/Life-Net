@@ -104,9 +104,8 @@ export function Categories() {
       <Dialog open={!!showInfo} onOpenChange={() => setShowInfo(null)}>
         <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-900 rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between text-gray-900 dark:text-white">
-              <span>{showInfo?.name} Organ</span>
-              <Button variant="ghost" size="sm" onClick={() => setShowInfo(null)} className="h-8 w-8 p-0"><X className="h-4 w-4" /></Button>
+            <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white pb-2">
+              {showInfo?.name} Organ Details
             </DialogTitle>
           </DialogHeader>
           {showInfo && (
