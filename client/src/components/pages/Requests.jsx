@@ -1,790 +1,457 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { Textarea } from "../ui/textarea";
-import {
-  AlertCircle,
-  Calendar,
-  User,
-  Building2,
-  Activity,
-  X,
-  Phone,
-  MapPin,
+  Search, Plus, Loader2, RefreshCw, X, AlertCircle, Clock, ShieldCheck, Truck,
+  CheckCircle2, XCircle, ClipboardList, Calendar, Heart, Droplets,
 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "../../lib/api";
+import { useAuth } from "../AuthContext";
 
-const initialRequests = [
-  {
-    request_id: "REQ-1024",
-    request_type: "Organ",
-    organ_type: "Kidney",
-    blood_group: "A+",
-    patient_name: "John Doe",
-    patient_age: 45,
-    hospital_id: "HOSP-001",
-    hospital_name: "Central Hospital",
-    priority: "High",
-    status: "Pending",
-    created_date: "2024-11-08",
-    medical_urgency: "Urgent - ESRD Stage 5",
-    doctor: "Dr. Sarah Williams",
-    contact: "+1 (555) 123-4567",
-    location: "New York, NY",
-  },
-  {
-    request_id: "REQ-1023",
-    request_type: "Blood",
-    organ_type: "O+ Blood",
-    blood_group: "O+",
-    patient_name: "Jane Smith",
-    patient_age: 32,
-    hospital_id: "HOSP-002",
-    hospital_name: "City Medical",
-    priority: "Critical",
-    status: "Matched",
-    created_date: "2024-11-09",
-    medical_urgency: "Emergency Surgery",
-    quantity: 4,
-    doctor: "Dr. Michael Chen",
-    contact: "+1 (555) 234-5678",
-    location: "Los Angeles, CA",
-  },
-  {
-    request_id: "REQ-1022",
-    request_type: "Organ",
-    organ_type: "Liver",
-    blood_group: "B+",
-    patient_name: "Mike Johnson",
-    patient_age: 52,
-    hospital_id: "HOSP-003",
-    hospital_name: "St. Mary's Hospital",
-    priority: "Medium",
-    status: "Processing",
-    created_date: "2024-11-07",
-    medical_urgency: "Cirrhosis - MELD Score 25",
-    doctor: "Dr. Robert Brown",
-    contact: "+1 (555) 345-6789",
-    location: "Chicago, IL",
-  },
-  {
-    request_id: "REQ-1021",
-    request_type: "Blood",
-    organ_type: "AB- Blood",
-    blood_group: "AB-",
-    patient_name: "Sarah Williams",
-    patient_age: 28,
-    hospital_id: "HOSP-004",
-    hospital_name: "General Hospital",
-    priority: "Low",
-    status: "Completed",
-    created_date: "2024-11-06",
-    medical_urgency: "Routine Transfusion",
-    quantity: 2,
-    doctor: "Dr. Emily Davis",
-    contact: "+1 (555) 456-7890",
-    location: "Houston, TX",
-  },
-  {
-    request_id: "REQ-1020",
-    request_type: "Organ",
-    organ_type: "Heart",
-    blood_group: "O-",
-    patient_name: "Robert Brown",
-    patient_age: 58,
-    hospital_id: "HOSP-005",
-    hospital_name: "Memorial Hospital",
-    priority: "Critical",
-    status: "Pending",
-    created_date: "2024-11-10",
-    medical_urgency: "Heart Failure - NYHA Class IV",
-    doctor: "Dr. Jennifer Martinez",
-    contact: "+1 (555) 567-8901",
-    location: "Miami, FL",
-  },
-];
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const ORGAN_TYPES = ["HEART", "LIVER", "KIDNEY", "LUNG", "PANCREAS", "INTESTINE", "CORNEA", "BONE_MARROW", "SKIN", "OTHER"];
+
+const statusColors = {
+  PENDING: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400",
+  MATCHED: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400",
+  APPROVED: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400",
+  IN_TRANSIT: "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400",
+  COMPLETED: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400",
+  REJECTED: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400",
+};
+
+const urgencyColors = {
+  EMERGENCY: "bg-red-600 text-white",
+  URGENT: "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400",
+  ROUTINE: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
+};
+
+const statusIcons = {
+  PENDING: Clock,
+  MATCHED: ShieldCheck,
+  APPROVED: CheckCircle2,
+  IN_TRANSIT: Truck,
+  COMPLETED: CheckCircle2,
+  REJECTED: XCircle,
+};
 
 export function Requests() {
-  const [requests, setRequests] = useState(initialRequests);
-  const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [processDialogOpen, setProcessDialogOpen] = useState(false);
-  const [requestToProcess, setRequestToProcess] = useState(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [newRequest, setNewRequest] = useState({
+    type: "BLOOD",
+    urgency: "ROUTINE",
+    resourceDetails: { bloodGroup: "O+", quantity: 1 },
+    patientAge: 30,
+    patientGender: "MALE",
+    notes: "",
+  });
 
-  const handleSubmit = (e) => {
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const data = await api.requests.list();
+      const items = data?.requests || data || [];
+      setRequests(Array.isArray(items) ? items : []);
+    } catch (error) {
+      console.error("Failed to fetch requests:", error);
+      toast.error("Failed to load requests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchRequests(); }, []);
+
+  const handleAction = async (id, action, label) => {
+    try {
+      setActionLoading(id);
+      await api.requests[action](id);
+      toast.success(`Request ${label} successfully`);
+      setSelectedRequest(null);
+      fetchRequests();
+    } catch (error) {
+      toast.error(error.message || `Failed to ${label} request`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreate = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newRequest = {
-      request_id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
-      request_type: formData.get("request_type"),
-      organ_type: formData.get("organ_type"),
-      blood_group: formData.get("blood_group"),
-      patient_name: formData.get("patient_name"),
-      patient_age: parseInt(formData.get("patient_age")),
-      hospital_id: formData.get("hospital_id"),
-      hospital_name: "New Hospital",
-      priority: formData.get("priority"),
-      status: "Pending",
-      created_date: new Date().toISOString().split("T")[0],
-      medical_urgency: formData.get("medical_urgency"),
-      quantity: formData.get("quantity")
-        ? parseInt(formData.get("quantity"))
-        : undefined,
-      doctor: "Dr. Assigned",
-      contact: "+1 (555) 000-0000",
-      location: "Location TBD",
-    };
-
-    setRequests([newRequest, ...requests]);
-    toast.success("Request submitted successfully");
-    setOpen(false);
+    try {
+      setCreateLoading(true);
+      await api.requests.create(newRequest);
+      toast.success("Request created successfully!");
+      setShowCreateDialog(false);
+      setNewRequest({ type: "BLOOD", urgency: "ROUTINE", resourceDetails: { bloodGroup: "O+", quantity: 1 }, patientAge: 30, patientGender: "MALE", notes: "" });
+      fetchRequests();
+    } catch (error) {
+      toast.error(error.message || "Failed to create request");
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
-  const handleProcess = () => {
-    if (!requestToProcess) return;
+  const filtered = requests.filter((r) => {
+    const matchesSearch =
+      (r._id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.type || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.notes || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === "ALL" || r.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
-    setRequests(
-      requests.map((req) =>
-        req.request_id === requestToProcess.request_id
-          ? { ...req, status: "Processing" }
-          : req,
-      ),
-    );
-
-    toast.success(
-      `Request ${requestToProcess.request_id} is now being processed`,
-    );
-    setProcessDialogOpen(false);
-    setRequestToProcess(null);
+  // Stats
+  const stats = {
+    total: requests.length,
+    pending: requests.filter((r) => r.status === "PENDING").length,
+    inProgress: requests.filter((r) => ["MATCHED", "APPROVED", "IN_TRANSIT"].includes(r.status)).length,
+    completed: requests.filter((r) => r.status === "COMPLETED").length,
   };
 
-  const handleApprove = (requestId) => {
-    setRequests(
-      requests.map((req) =>
-        req.request_id === requestId ? { ...req, status: "Matched" } : req,
-      ),
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-3 text-gray-500 dark:text-gray-400">Loading requests...</span>
+      </div>
     );
-    toast.success("Request approved and matched successfully");
-  };
-
-  const handleReject = (requestId) => {
-    setRequests(
-      requests.map((req) =>
-        req.request_id === requestId ? { ...req, status: "Rejected" } : req,
-      ),
-    );
-    toast.error("Request has been rejected");
-  };
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-gray-900 dark:text-white">Requests</h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Manage organ and blood requests
-          </p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Requests</h1>
+          <p className="text-gray-500 dark:text-gray-400">Manage organ and blood requests</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <Button
-            onClick={() => setOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-          >
-            New Request
+        <div className="flex gap-3">
+          <Button variant="outline" size="sm" onClick={fetchRequests} className="rounded-xl border-gray-300 dark:border-gray-700">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
-          <DialogContent className="sm:max-w-[500px] rounded-2xl bg-white dark:bg-gray-900">
-            <DialogHeader>
-              <DialogTitle className="text-gray-900 dark:text-white">
-                Create New Request
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="request_type"
-                  className="text-gray-900 dark:text-white"
-                >
-                  Request Type
-                </Label>
-                <Select name="request_type" required>
-                  <SelectTrigger className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="organ">Organ</SelectItem>
-                    <SelectItem value="blood">Blood</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="organ_type"
-                  className="text-gray-900 dark:text-white"
-                >
-                  Organ/Blood Type
-                </Label>
-                <Input
-                  id="organ_type"
-                  name="organ_type"
-                  placeholder="e.g., Kidney, A+ Blood"
-                  className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="blood_group"
-                    className="text-gray-900 dark:text-white"
-                  >
-                    Blood Group
-                  </Label>
-                  <Select name="blood_group" required>
-                    <SelectTrigger className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A+">A+</SelectItem>
-                      <SelectItem value="A-">A-</SelectItem>
-                      <SelectItem value="B+">B+</SelectItem>
-                      <SelectItem value="B-">B-</SelectItem>
-                      <SelectItem value="AB+">AB+</SelectItem>
-                      <SelectItem value="AB-">AB-</SelectItem>
-                      <SelectItem value="O+">O+</SelectItem>
-                      <SelectItem value="O-">O-</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="quantity"
-                    className="text-gray-900 dark:text-white"
-                  >
-                    Quantity (for blood)
-                  </Label>
-                  <Input
-                    id="quantity"
-                    name="quantity"
-                    type="number"
-                    placeholder="Units"
-                    className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="patient_name"
-                  className="text-gray-900 dark:text-white"
-                >
-                  Patient Name
-                </Label>
-                <Input
-                  id="patient_name"
-                  name="patient_name"
-                  placeholder="Full name"
-                  className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="patient_age"
-                    className="text-gray-900 dark:text-white"
-                  >
-                    Patient Age
-                  </Label>
-                  <Input
-                    id="patient_age"
-                    name="patient_age"
-                    type="number"
-                    placeholder="Age"
-                    className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="priority"
-                    className="text-gray-900 dark:text-white"
-                  >
-                    Priority
-                  </Label>
-                  <Select name="priority" required>
-                    <SelectTrigger className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Critical">Critical</SelectItem>
-                      <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="hospital_id"
-                  className="text-gray-900 dark:text-white"
-                >
-                  Hospital ID
-                </Label>
-                <Input
-                  id="hospital_id"
-                  name="hospital_id"
-                  placeholder="HOSP-XXX"
-                  className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="medical_urgency"
-                  className="text-gray-900 dark:text-white"
-                >
-                  Medical Urgency / Notes
-                </Label>
-                <Textarea
-                  id="medical_urgency"
-                  name="medical_urgency"
-                  placeholder="Describe urgency and medical condition"
-                  className="rounded-xl bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  className="flex-1 rounded-xl border-gray-300 dark:border-gray-700"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
-                >
-                  Submit Request
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+          <Button className="bg-blue-600 hover:bg-blue-700 rounded-xl" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="w-4 h-4 mr-2" /> New Request
+          </Button>
+        </div>
       </div>
 
-      {/* Requests List */}
-      <div className="space-y-4">
-        {requests.map((request) => (
-          <Card
-            key={request.request_id}
-            className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900"
-          >
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <CardTitle className="text-gray-900 dark:text-white">
-                      {request.request_id}
-                    </CardTitle>
-                    <Badge
-                      className={`rounded-lg ${
-                        request.priority === "Critical"
-                          ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400"
-                          : request.priority === "High"
-                            ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
-                            : request.priority === "Medium"
-                              ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                      } hover:bg-current`}
-                    >
-                      {request.priority === "Critical" && (
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                      )}
-                      {request.priority}
-                    </Badge>
-                    <Badge
-                      className={`rounded-lg ${
-                        request.status === "Completed"
-                          ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400"
-                          : request.status === "Matched"
-                            ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
-                            : request.status === "Processing"
-                              ? "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400"
-                              : request.status === "Rejected"
-                                ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                      } hover:bg-current`}
-                    >
-                      {request.status}
-                    </Badge>
-                  </div>
-                  <p className="text-blue-600 dark:text-blue-400">
-                    {request.organ_type}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="rounded-xl border-gray-300 dark:border-gray-700"
-                    onClick={() => setSelectedRequest(request)}
-                  >
-                    View Details
-                  </Button>
-                  {request.status === "Pending" && (
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-                      onClick={() => {
-                        setRequestToProcess(request);
-                        setProcessDialogOpen(true);
-                      }}
-                    >
-                      Process
-                    </Button>
-                  )}
-                </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: "Total", value: stats.total, icon: ClipboardList, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950" },
+          { label: "Pending", value: stats.pending, icon: Clock, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950" },
+          { label: "In Progress", value: stats.inProgress, icon: Truck, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950" },
+          { label: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950" },
+        ].map((s) => (
+          <Card key={s.label} className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center`}>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Patient
-                    </p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {request.patient_name}, {request.patient_age}y
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Blood Group
-                    </p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {request.blood_group}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Hospital
-                    </p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {request.hospital_name}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Created
-                    </p>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {request.created_date}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-xl">
-                <p className="text-sm text-amber-900 dark:text-amber-200">
-                  <span className="text-amber-700 dark:text-amber-400">
-                    Medical Urgency:
-                  </span>{" "}
-                  {request.medical_urgency}
-                </p>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{s.value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{s.label}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Request Detail Dialog */}
-      <Dialog
-        open={!!selectedRequest}
-        onOpenChange={() => setSelectedRequest(null)}
-      >
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Search requests..." className="pl-10 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {["ALL", "PENDING", "MATCHED", "APPROVED", "IN_TRANSIT", "COMPLETED", "REJECTED"].map((s) => (
+            <Button key={s} variant={filterStatus === s ? "default" : "outline"} size="sm"
+              className={`rounded-xl text-xs ${filterStatus === s ? "bg-blue-600 hover:bg-blue-700" : "border-gray-300 dark:border-gray-700"}`}
+              onClick={() => setFilterStatus(s)}>
+              {s === "ALL" ? "All" : s.replace(/_/g, " ")}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Requests Table */}
+      <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+        <CardContent className="p-0">
+          {filtered.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-800">
+                    {["ID", "Type", "Resource", "Urgency", "Status", "Created", "Actions"].map((h) => (
+                      <th key={h} className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((req) => {
+                    const StatusIcon = statusIcons[req.status] || Clock;
+                    return (
+                      <tr key={req._id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <td className="py-4 px-4 text-sm font-mono text-gray-900 dark:text-white">{req._id?.slice(-6).toUpperCase()}</td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1.5">
+                            {req.type === "ORGAN" ? <Heart className="w-3.5 h-3.5 text-rose-500" /> : <Droplets className="w-3.5 h-3.5 text-blue-500" />}
+                            <span className="text-sm text-gray-900 dark:text-white">{req.type}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
+                          {req.type === "ORGAN" ? req.resourceDetails?.organType?.replace(/_/g, " ") : `${req.resourceDetails?.bloodGroup} × ${req.resourceDetails?.quantity || 1}`}
+                        </td>
+                        <td className="py-4 px-4">
+                          <Badge className={`rounded-lg text-xs ${urgencyColors[req.urgency] || urgencyColors.ROUTINE}`}>
+                            {req.urgency === "EMERGENCY" && <AlertCircle className="w-3 h-3 mr-1" />}
+                            {req.urgency}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-4">
+                          <Badge className={`rounded-lg text-xs ${statusColors[req.status] || ""}`}>
+                            <StatusIcon className="w-3 h-3 mr-1" />{req.status?.replace(/_/g, " ")}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">{new Date(req.createdAt).toLocaleDateString()}</td>
+                        <td className="py-4 px-4">
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" className="text-blue-600 dark:text-blue-400 h-8 px-2" onClick={() => setSelectedRequest(req)}>View</Button>
+                            {req.status === "PENDING" && (
+                              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 px-2 text-xs rounded-lg" disabled={actionLoading === req._id}
+                                onClick={() => handleAction(req._id, "approve", "approved")}>
+                                {actionLoading === req._id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Approve"}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <ClipboardList className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">No requests found.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Request Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[520px] rounded-2xl bg-white dark:bg-gray-900">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-white">Create New Request</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Request Type</Label>
+                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                  value={newRequest.type} onChange={(e) => {
+                    const type = e.target.value;
+                    setNewRequest({ ...newRequest, type, resourceDetails: type === "ORGAN" ? { organType: "KIDNEY", bloodGroup: "O+" } : { bloodGroup: "O+", quantity: 1 } });
+                  }}>
+                  <option value="BLOOD">Blood</option>
+                  <option value="ORGAN">Organ</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Urgency</Label>
+                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                  value={newRequest.urgency} onChange={(e) => setNewRequest({ ...newRequest, urgency: e.target.value })}>
+                  <option value="ROUTINE">Routine</option>
+                  <option value="URGENT">Urgent</option>
+                  <option value="EMERGENCY">Emergency</option>
+                </select>
+              </div>
+            </div>
+
+            {newRequest.type === "BLOOD" ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Blood Group</Label>
+                  <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    value={newRequest.resourceDetails.bloodGroup} onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, bloodGroup: e.target.value } })}>
+                    {BLOOD_GROUPS.map((bg) => (<option key={bg} value={bg}>{bg}</option>))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Units Needed</Label>
+                  <Input type="number" min="1" className="rounded-xl" value={newRequest.resourceDetails.quantity || 1}
+                    onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, quantity: parseInt(e.target.value) || 1 } })} />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Organ Type</Label>
+                  <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    value={newRequest.resourceDetails.organType || "KIDNEY"} onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, organType: e.target.value } })}>
+                    {ORGAN_TYPES.map((t) => (<option key={t} value={t}>{t.replace(/_/g, " ")}</option>))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Blood Group</Label>
+                  <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    value={newRequest.resourceDetails.bloodGroup} onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, bloodGroup: e.target.value } })}>
+                    {BLOOD_GROUPS.map((bg) => (<option key={bg} value={bg}>{bg}</option>))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Patient Age</Label>
+                <Input type="number" min="0" max="120" className="rounded-xl" value={newRequest.patientAge}
+                  onChange={(e) => setNewRequest({ ...newRequest, patientAge: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                  value={newRequest.patientGender} onChange={(e) => setNewRequest({ ...newRequest, patientGender: e.target.value })}>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Input className="rounded-xl" placeholder="Additional details..." value={newRequest.notes}
+                onChange={(e) => setNewRequest({ ...newRequest, notes: e.target.value })} />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button type="submit" disabled={createLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl">
+                {createLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                Create Request
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)} className="rounded-xl">Cancel</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Detail Dialog with Workflow */}
+      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
         <DialogContent className="sm:max-w-[600px] bg-white dark:bg-gray-900 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between text-gray-900 dark:text-white">
-              <span>Request {selectedRequest?.request_id}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedRequest(null)}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <span>Request {selectedRequest?._id?.slice(-6).toUpperCase()}</span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedRequest(null)} className="h-8 w-8 p-0"><X className="h-4 w-4" /></Button>
             </DialogTitle>
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4 pt-4">
+              {/* Status workflow visualization */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                {["PENDING", "MATCHED", "APPROVED", "IN_TRANSIT", "COMPLETED"].map((step, idx) => {
+                  const StepIcon = statusIcons[step];
+                  const isActive = step === selectedRequest.status;
+                  const isPast = ["PENDING", "MATCHED", "APPROVED", "IN_TRANSIT", "COMPLETED"].indexOf(selectedRequest.status) >= idx;
+                  return (
+                    <div key={step} className="flex items-center gap-1">
+                      {idx > 0 && <div className={`w-6 h-0.5 ${isPast ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"}`} />}
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap ${isActive ? "bg-blue-600 text-white" : isPast ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-400"}`}>
+                        <StepIcon className="w-3 h-3" />
+                        {step.replace(/_/g, " ")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="flex gap-3 flex-wrap">
-                <Badge
-                  className={`${
-                    selectedRequest.priority === "Critical"
-                      ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400"
-                      : selectedRequest.priority === "High"
-                        ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
-                        : selectedRequest.priority === "Medium"
-                          ? "bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-400"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                  } hover:bg-current`}
-                >
-                  {selectedRequest.priority} Priority
-                </Badge>
-                <Badge
-                  className={`${
-                    selectedRequest.status === "Completed"
-                      ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400"
-                      : selectedRequest.status === "Matched"
-                        ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
-                        : selectedRequest.status === "Processing"
-                          ? "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                  } hover:bg-current`}
-                >
-                  {selectedRequest.status}
+                <Badge className={urgencyColors[selectedRequest.urgency] || ""}>{selectedRequest.urgency}</Badge>
+                <Badge className={statusColors[selectedRequest.status] || ""}>{selectedRequest.status}</Badge>
+                <Badge variant="outline">
+                  {selectedRequest.type === "ORGAN" ? <Heart className="w-3 h-3 mr-1" /> : <Droplets className="w-3 h-3 mr-1" />}
+                  {selectedRequest.type}
                 </Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Request Type
-                  </p>
-                  <p className="text-gray-900 dark:text-white">
-                    {selectedRequest.organ_type}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Resource</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedRequest.type === "ORGAN"
+                      ? selectedRequest.resourceDetails?.organType?.replace(/_/g, " ")
+                      : `${selectedRequest.resourceDetails?.bloodGroup} × ${selectedRequest.resourceDetails?.quantity || 1} units`}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Blood Group
-                  </p>
-                  <p className="text-gray-900 dark:text-white">
-                    {selectedRequest.blood_group}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Patient</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    Age {selectedRequest.patientAge || "N/A"}, {selectedRequest.patientGender || "N/A"}
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <h4 className="text-sm text-gray-900 dark:text-white mb-3">
-                  Patient Information
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Name:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.patient_name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Age:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.patient_age} years
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Blood Type:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.blood_group}
-                    </span>
-                  </div>
-                  {selectedRequest.quantity && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Quantity Needed:
-                      </span>
-                      <span className="text-gray-900 dark:text-white">
-                        {selectedRequest.quantity} units
-                      </span>
-                    </div>
-                  )}
+              {selectedRequest.notes && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-xl">
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-200 mb-1">Notes</p>
+                  <p className="text-sm text-amber-800 dark:text-amber-300">{selectedRequest.notes}</p>
                 </div>
+              )}
+
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <Calendar className="w-4 h-4" />
+                Created: {new Date(selectedRequest.createdAt).toLocaleString()}
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <h4 className="text-sm text-gray-900 dark:text-white mb-3">
-                  Hospital Information
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.hospital_name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Activity className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Hospital ID:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.hospital_id}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.location}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.contact}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Doctor:
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {selectedRequest.doctor}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-xl">
-                <h4 className="text-sm text-amber-900 dark:text-amber-200 mb-2">
-                  Medical Urgency
-                </h4>
-                <p className="text-sm text-amber-800 dark:text-amber-300">
-                  {selectedRequest.medical_urgency}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-600 dark:text-gray-400">
-                  Created:
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  {selectedRequest.created_date}
-                </span>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                {selectedRequest.status === "Pending" && (
+              {/* Workflow Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-800 flex-wrap">
+                {selectedRequest.status === "PENDING" && (
                   <>
-                    <Button
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl"
-                      onClick={() => {
-                        handleApprove(selectedRequest.request_id);
-                        setSelectedRequest(null);
-                      }}
-                    >
+                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
+                      onClick={() => handleAction(selectedRequest._id, "approve", "approved")}>
+                      {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
                       Approve
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 rounded-xl border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
-                      onClick={() => {
-                        handleReject(selectedRequest.request_id);
-                        setSelectedRequest(null);
-                      }}
-                    >
-                      Reject
+                    <Button variant="outline" className="rounded-xl border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                      disabled={actionLoading === selectedRequest._id}
+                      onClick={() => handleAction(selectedRequest._id, "reject", "rejected")}>
+                      <XCircle className="w-4 h-4 mr-2" /> Reject
                     </Button>
                   </>
                 )}
-                {selectedRequest.status !== "Pending" && (
-                  <Button
-                    variant="outline"
-                    className="flex-1 rounded-xl border-gray-300 dark:border-gray-700"
-                  >
-                    Contact Hospital
+                {selectedRequest.status === "APPROVED" && (
+                  <Button className="flex-1 bg-orange-600 hover:bg-orange-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
+                    onClick={() => handleAction(selectedRequest._id, "transfer", "marked in transit")}>
+                    {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Truck className="w-4 h-4 mr-2" />}
+                    Mark In Transit
                   </Button>
                 )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Process Request Dialog */}
-      <Dialog open={processDialogOpen} onOpenChange={setProcessDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-900 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-gray-900 dark:text-white">
-              Process Request
-            </DialogTitle>
-          </DialogHeader>
-          {requestToProcess && (
-            <div className="space-y-4 pt-4">
-              <p className="text-gray-600 dark:text-gray-400">
-                Are you sure you want to start processing request{" "}
-                <strong>{requestToProcess.request_id}</strong>?
-              </p>
-
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-xl">
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Patient:</strong> {requestToProcess.patient_name}
-                </p>
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Type:</strong> {requestToProcess.organ_type}
-                </p>
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Priority:</strong> {requestToProcess.priority}
-                </p>
-              </div>
-
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                This will change the request status to "Processing" and notify
-                the relevant medical staff.
-              </p>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1 rounded-xl border-gray-300 dark:border-gray-700"
-                  onClick={() => setProcessDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
-                  onClick={handleProcess}
-                >
-                  Confirm Process
-                </Button>
+                {selectedRequest.status === "IN_TRANSIT" && (
+                  <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
+                    onClick={() => handleAction(selectedRequest._id, "complete", "completed")}>
+                    {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                    Mark Completed
+                  </Button>
+                )}
+                {["COMPLETED", "REJECTED"].includes(selectedRequest.status) && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">This request has been {selectedRequest.status.toLowerCase()}.</p>
+                )}
               </div>
             </div>
           )}

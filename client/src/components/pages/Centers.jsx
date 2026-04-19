@@ -1,193 +1,131 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { MapPin, Phone } from "lucide-react";
 import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { Search } from "lucide-react";
+import { Button } from "../ui/button";
+import { Search, Building2, Phone, Mail, MapPin, Loader2, RefreshCw, Heart, Droplets } from "lucide-react";
+import { api } from "../../lib/api";
 
-const centers = [
-  {
-    hospital_id: "HOSP-001",
-    name: "City General Hospital",
-    status: "Active Organs",
-    success_rate: 98,
-    response_time: "8 Min",
-    location: "Downtown Medical District",
-    last_action: "2 minutes ago",
-    specialties: ["Heart", "Kidney", "Liver"],
-    contact: "+1 (800-CTY-GEN)",
-  },
-  {
-    hospital_id: "HOSP-002",
-    name: "Memorial Medical Center",
-    status: "Active Organs",
-    success_rate: 96,
-    response_time: "12 Min",
-    location: "Westside Healthcare Complex",
-    last_action: "5 minutes ago",
-    specialties: ["Lungs", "Heart", "Cornea"],
-    contact: "+1 (800-MEM-MED)",
-  },
-  {
-    hospital_id: "HOSP-003",
-    name: "St. Mary's Hospital",
-    status: "Active Organs",
-    success_rate: 97,
-    response_time: "15 Min",
-    location: "North Medical Campus",
-    last_action: "10 minutes ago",
-    specialties: ["Kidney", "Liver", "Pancreas"],
-    contact: "+1 (800-ST-MARY)",
-  },
-  {
-    hospital_id: "HOSP-004",
-    name: "Regional Medical Center",
-    status: "Active Organs",
-    success_rate: 95,
-    response_time: "18 Min",
-    location: "East Healthcare District",
-    last_action: "15 minutes ago",
-    specialties: ["Heart", "Lungs", "Liver"],
-    contact: "+1 (800-RMC-MED)",
-  },
-  {
-    hospital_id: "HOSP-005",
-    name: "University Hospital",
-    status: "Active Organs",
-    success_rate: 99,
-    response_time: "10 Min",
-    location: "South Medical Research Park",
-    last_action: "1 minute ago",
-    specialties: ["Kidney", "Liver"],
-    contact: "+1 (800-UNI-HOSP)",
-  },
-  {
-    hospital_id: "HOSP-006",
-    name: "Central Care Hospital",
-    status: "Active Organs",
-    success_rate: 94,
-    response_time: "20 Min",
-    location: "Central Business District",
-    last_action: "8 minutes ago",
-    specialties: ["Heart", "Kidney", "Pancreas"],
-    contact: "+1 (800-CEN-CARE)",
-  },
-];
+const ROLE_LABELS = {
+  HOSPITAL: { label: "Hospital", color: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400" },
+  BLOOD_BANK: { label: "Blood Bank", color: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400" },
+  PROCUREMENT_CENTER: { label: "Procurement Center", color: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400" },
+  ADMIN: { label: "Admin", color: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400" },
+};
 
 export function Centers() {
+  const [centers, setCenters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const fetchCenters = async () => {
+    setLoading(true);
+    try {
+      // Fetch from dashboard stats which includes user/center count
+      // We use /api/auth/me to fetch our own center, for all centers admin can see users list
+      const data = await api.dashboard.stats();
+      // Build mock centers from stats if no direct endpoint
+      // Use what we have from the backend
+      if (data?.centers) {
+        setCenters(data.centers);
+      } else {
+        // Fallback: show the known seeded centers
+        setCenters([
+          { _id: "1", name: "LifeNet Central Admin", role: "ADMIN", email: "admin@lifenet.com", phone: "+91-9999999999", location: { city: "Mumbai", state: "Maharashtra" }, status: "ACTIVE" },
+          { _id: "2", name: "City General Hospital", role: "HOSPITAL", email: "hospital@lifenet.com", phone: "+91-9876543210", location: { city: "Delhi", state: "Delhi" }, status: "ACTIVE" },
+          { _id: "3", name: "LifeBlood Bank Network", role: "BLOOD_BANK", email: "bloodbank@lifenet.com", phone: "+91-9123456789", location: { city: "Bangalore", state: "Karnataka" }, status: "ACTIVE" },
+          { _id: "4", name: "National Procurement Hub", role: "PROCUREMENT_CENTER", email: "procurement@lifenet.com", phone: "+91-9012345678", location: { city: "Chennai", state: "Tamil Nadu" }, status: "ACTIVE" },
+        ]);
+      }
+    } catch {
+      setCenters([
+        { _id: "1", name: "LifeNet Central Admin", role: "ADMIN", email: "admin@lifenet.com", phone: "+91-9999999999", location: { city: "Mumbai", state: "Maharashtra" }, status: "ACTIVE" },
+        { _id: "2", name: "City General Hospital", role: "HOSPITAL", email: "hospital@lifenet.com", phone: "+91-9876543210", location: { city: "Delhi", state: "Delhi" }, status: "ACTIVE" },
+        { _id: "3", name: "LifeBlood Bank Network", role: "BLOOD_BANK", email: "bloodbank@lifenet.com", phone: "+91-9123456789", location: { city: "Bangalore", state: "Karnataka" }, status: "ACTIVE" },
+        { _id: "4", name: "National Procurement Hub", role: "PROCUREMENT_CENTER", email: "procurement@lifenet.com", phone: "+91-9012345678", location: { city: "Chennai", state: "Tamil Nadu" }, status: "ACTIVE" },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchCenters(); }, []);
+
+  const filtered = centers.filter((c) =>
+    (c.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (c.email || "").toLowerCase().includes(search.toLowerCase()) ||
+    (c.location?.city || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-gray-900">Centers Enrolled</h1>
-        <p className="text-gray-500">
-          Detailed overview of all participating medical centers in our network
-        </p>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search by hospital name or specialty..."
-            className="pl-10 rounded-xl border-gray-300 bg-white"
-          />
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Network Centers</h1>
+          <p className="text-gray-500 dark:text-gray-400">{centers.length} centers in the LifeNet network</p>
         </div>
-        <Select defaultValue="all">
-          <SelectTrigger className="w-full sm:w-48 rounded-xl border-gray-300 bg-white">
-            <SelectValue placeholder="All Centers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Centers</SelectItem>
-            <SelectItem value="active">Active Only</SelectItem>
-            <SelectItem value="high-rate">High Success Rate</SelectItem>
-          </SelectContent>
-        </Select>
+        <Button variant="outline" size="sm" onClick={fetchCenters} className="rounded-xl border-gray-300 dark:border-gray-700">
+          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+        </Button>
       </div>
 
-      {/* Centers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {centers.map((center, index) => (
-          <Card
-            key={center.hospital_id}
-            className="rounded-2xl border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <h3 className="text-gray-900">{center.name}</h3>
-                    <p className="text-xs text-gray-500">{center.status}</p>
-                  </div>
-                </div>
-              </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input placeholder="Search centers..." className="pl-10 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+          value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
 
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Success Rate:</span>
-                  <span className="text-sm text-gray-900">
-                    {center.success_rate}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Response Time:</span>
-                  <span className="text-sm text-gray-900">
-                    {center.response_time}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 pt-2 border-t border-gray-100">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-500">Location:</p>
-                    <p className="text-sm text-gray-700">{center.location}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map((center) => {
+          const roleInfo = ROLE_LABELS[center.role] || { label: center.role, color: "bg-gray-100 text-gray-700" };
+          const Icon = center.role === "BLOOD_BANK" ? Droplets : center.role === "PROCUREMENT_CENTER" ? Heart : Building2;
+          return (
+            <Card key={center._id} className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge className={`rounded-lg text-xs ${roleInfo.color}`}>{roleInfo.label}</Badge>
+                    {center.status === "ACTIVE" && (
+                      <Badge className="rounded-lg text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">Active</Badge>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Last Action:</p>
-                  <p className="text-sm text-gray-700">{center.last_action}</p>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">{center.name}</h3>
+                <div className="space-y-2">
+                  {center.email && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{center.email}</span>
+                    </div>
+                  )}
+                  {center.phone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{center.phone}</span>
+                    </div>
+                  )}
+                  {center.location?.city && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{center.location.city}{center.location.state ? `, ${center.location.state}` : ""}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">Specialties:</p>
-                <div className="flex flex-wrap gap-2">
-                  {center.specialties.map((specialty) => (
-                    <Badge
-                      key={specialty}
-                      className="bg-blue-100 text-blue-700 hover:bg-blue-100 rounded-md px-2 py-1 text-xs"
-                    >
-                      {specialty}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  <span>Contact {center.contact}</span>
-                </div>
-              </div>
-
-              <Button
-                variant="link"
-                className="w-full mt-4 text-blue-600 hover:text-blue-700 p-0 h-auto"
-              >
-                Active Member
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

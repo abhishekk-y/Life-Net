@@ -1,5 +1,8 @@
 // API client for LifeNet — wired to our Express backend
-const API_BASE = '/api';
+// Uses VITE_API_URL in production (e.g. https://lifenet-api.onrender.com)
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 const getAuthToken = () => localStorage.getItem('accessToken');
 
