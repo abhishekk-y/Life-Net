@@ -18,3 +18,10 @@ Thumbs.db
 coverage/
 server/uploads/*
 !server/uploads/.gitkeep
+
+# Reference/temp folders — not part of source
+temp_tuskydv_lifenet/
+temp_*/
+
+# Deployment docs (keep local only)
+DEPLOY.md
