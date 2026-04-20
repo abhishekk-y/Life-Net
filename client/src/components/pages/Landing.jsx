@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { NetworkMap } from "../ui/NetworkMap";
 import {
   Heart, Users, Activity, TrendingUp, ArrowRight, Droplets, Building2,
   Clock, Shield, Moon, Sun, CheckCircle2, Zap, Globe, Bell, ChevronRight,
@@ -180,6 +181,12 @@ export function Landing() {
                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Live Network Feed</span>
                   <Badge className="ml-auto bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-full text-xs">Live</Badge>
                 </div>
+                
+                {/* Embedded Mini Network Map */}
+                <div className="mb-4 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800">
+                  <NetworkMap />
+                </div>
+
                 <div className="space-y-2">
                   {urgencyItems.map((item, i) => (
                     <div key={i}
