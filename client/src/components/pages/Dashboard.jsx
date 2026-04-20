@@ -23,6 +23,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
+import { NetworkMap } from "../ui/NetworkMap";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -226,6 +227,11 @@ export function Dashboard() {
           );
         })}
       </div>
+
+      {/* Network Command Map */}
+      <Card className="rounded-2xl border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+        <NetworkMap />
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Blood Inventory - REAL DATA */}

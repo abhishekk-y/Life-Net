@@ -197,3 +197,47 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* ═════════════ Print / Clinical Document Styles ═════════════ */
+@media print {
+  @page { margin: 1cm; }
+  
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  /* Hide UI elements not meant for print */
+  nav, header, footer, button, .sidebar, .no-print {
+    display: none !important;
+  }
+
+  /* Expand hidden scroll areas */
+  .custom-scrollbar {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Reset cards to clean borders */
+  .sm\:max-w-\[700px\] {
+    max-width: 100% !important;
+    border: 2px solid black !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Convert dark backgrounds to light for print */
+  .bg-black, .bg-gray-900, .bg-gray-950, .dark {
+    background: white !important;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Ensure badges and colored text print properly with outlines */
+  .badge, [class*="bg-emerald-"], [class*="bg-blue-"], [class*="bg-red-"] {
+    border: 1px solid black !important;
+    background: transparent !important;
+    color: black !important;
+  }
+}

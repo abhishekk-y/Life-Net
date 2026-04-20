@@ -5,7 +5,7 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Label } from "../ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { Search, Eye, X, Calendar, MapPin, User, Activity, Plus, Loader2, Heart } from "lucide-react";
+import { Search, Eye, X, Calendar, MapPin, User, Activity, Plus, Loader2, Heart, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
@@ -404,15 +404,20 @@ export function Organs() {
               </div>
 
               {/* Action Bar */}
-              <div className="p-4 border-t border-gray-800 bg-black flex justify-end gap-3">
-                <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800" onClick={() => setSelectedOrgan(null)}>
-                  Close Profile
+              <div className="p-4 border-t border-gray-800 bg-black flex justify-between gap-3">
+                <Button variant="outline" className="border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 gap-2" onClick={() => window.print()}>
+                  <Printer className="w-4 h-4" /> Print Dispatch Report
                 </Button>
-                {selectedOrgan.status === 'AVAILABLE' && (
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
-                    Initiate Procurement Match
+                <div className="flex gap-3">
+                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800" onClick={() => setSelectedOrgan(null)}>
+                    Close Profile
                   </Button>
-                )}
+                  {selectedOrgan.status === 'AVAILABLE' && (
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold no-print">
+                      Initiate Procurement Match
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}

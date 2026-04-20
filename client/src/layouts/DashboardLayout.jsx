@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../redux/authSlice';
@@ -27,6 +27,16 @@ export default function DashboardLayout() {
     dispatch(logout());
     navigate('/login');
   };
+
+  // High-stakes Acoustic Alert
+  useEffect(() => {
+    if (unreadCount > 0) {
+      // Very short, subtle sci-fi "ping" sound as a base64 Data URI
+      const audio = new Audio("data:audio/wav;base64,UklGRloAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVEAAAAAAABfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f");
+      audio.volume = 0.5;
+      audio.play().catch(() => {}); // catch to prevent DOM Exception if user hasn't interacted with page yet
+    }
+  }, [unreadCount]);
 
   const roleBadgeColor = {
     ADMIN: 'badge-danger',
