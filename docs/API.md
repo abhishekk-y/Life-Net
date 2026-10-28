@@ -55,6 +55,7 @@ Protected requests use `Authorization: Bearer <access_token>`. Sign-in also issu
 | POST | `/appointments` | Patient |
 | PATCH | `/appointments/:id` | Patient, assigned doctor, admin (allowed workflow actions only) |
 | GET | `/centers` | Signed-in user; admin can view applications |
+| GET | `/centers/hospitals` | Signed-in user; approved, active hospitals only; supports `search` and `city` |
 | PATCH | `/centers/:id/verification` | Admin |
 
 ## Pharmacy and supply orders

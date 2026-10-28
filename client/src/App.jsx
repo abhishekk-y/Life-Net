@@ -25,6 +25,7 @@ const BloodManagement = lazyPage(() => import("./components/pages/BloodManagemen
 const Login = lazyPage(() => import("./components/pages/Login"), "Login");
 const Register = lazyPage(() => import("./components/pages/Register"), "Register");
 const Doctors = lazyPage(() => import("./components/pages/Doctors"), "Doctors");
+const Hospitals = lazyPage(() => import("./components/pages/Hospitals"), "Hospitals");
 const Appointments = lazyPage(() => import("./components/pages/Appointments"), "Appointments");
 const Pharmacy = lazyPage(() => import("./components/pages/Pharmacy"), "Pharmacy");
 const PharmacyOrders = lazyPage(() => import("./components/pages/PharmacyOrders"), "PharmacyOrders");
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="blood-bank" element={<RoleGate roles={["ADMIN", "HOSPITAL", "BLOOD_BANK", "PATIENT"]}><BloodBank /></RoleGate>} />
               <Route path="blood-management" element={<RoleGate roles={["ADMIN", "BLOOD_BANK"]}><BloodManagement /></RoleGate>} />
               <Route path="doctors" element={<RoleGate roles={["ADMIN", "PATIENT", "DOCTOR"]}><Doctors /></RoleGate>} />
+              <Route path="hospitals" element={<RoleGate roles={["ADMIN", "PATIENT", "DOCTOR", "HOSPITAL", "PHARMACY", "SUPPLIER", "BLOOD_BANK", "PROCUREMENT_CENTER"]}><Hospitals /></RoleGate>} />
               <Route path="appointments" element={<RoleGate roles={["ADMIN", "PATIENT", "DOCTOR"]}><Appointments /></RoleGate>} />
               <Route path="pharmacy" element={<RoleGate roles={["ADMIN", "PATIENT", "PHARMACY"]}><Pharmacy /></RoleGate>} />
               <Route path="pharmacy-orders" element={<RoleGate roles={["ADMIN", "PATIENT", "PHARMACY"]}><PharmacyOrders /></RoleGate>} />

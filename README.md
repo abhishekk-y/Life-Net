@@ -10,6 +10,7 @@ This repository contains a working MVP and its deployment configuration. It is n
 | --- | --- |
 | Accounts and access | Email verification, sign-in, password recovery, profile and password updates, role-based access, and admin review of provider applications |
 | Doctor appointments | Approved doctors publish profiles and in-person appointment slots; patients request slots; doctors confirm or reject; allowed users can cancel |
+| Hospital discovery | Signed-in users can search the approved hospital directory by organization/name and location |
 | Blood coordination | Blood banks manage reported inventory; hospitals create requests; authorized centers review and reserve stock; status history tracks fulfillment |
 | Organ coordination | Procurement centers manage operational records; organizations can review a shortlist and follow a request workflow. This is not a donor-recipient allocation system |
 | Pharmacy | Pharmacies list medicine details and pickup availability; patients place pickup requests; pharmacies update order status |

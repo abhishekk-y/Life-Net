@@ -82,6 +82,13 @@ export const api = {
   },
   centers: {
     list: (search = '') => apiRequest(`/centers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+    hospitals: ({ search = '', city = '' } = {}) => {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      if (city.trim()) params.set('city', city.trim());
+      const query = params.toString();
+      return apiRequest(`/centers/hospitals${query ? `?${query}` : ''}`);
+    },
     setVerification: (id, status) => apiRequest(`/centers/${id}/verification`, jsonBody('PATCH', { status })),
   },
   doctors: {

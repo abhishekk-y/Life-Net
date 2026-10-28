@@ -4,6 +4,31 @@ const asyncHandler = require('../utils/asyncHandler');
 const { logAudit } = require('../services/auditService');
 
 const REVIEWABLE_ROLES = ['DOCTOR', 'HOSPITAL', 'PHARMACY', 'SUPPLIER', 'BLOOD_BANK', 'PROCUREMENT_CENTER'];
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getHospitals = asyncHandler(async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  const city = typeof req.query.city === 'string' ? req.query.city.trim().slice(0, 100) : '';
+  const filter = { role: 'HOSPITAL', verificationStatus: 'APPROVED', isActive: true };
+  if (search) {
+    const term = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [
+      { organization: term },
+      { name: term },
+      { 'address.city': term },
+      { 'address.state': term },
+    ];
+  }
+  if (city) filter['address.city'] = { $regex: escapeRegex(city), $options: 'i' };
+
+  const hospitals = await User.find(filter)
+    .select('name organization phone address')
+    .sort({ organization: 1, name: 1 })
+    .limit(100)
+    .lean();
+
+  res.json({ success: true, data: hospitals });
+});
 
 const getCenters = asyncHandler(async (req, res) => {
   const { search = '' } = req.query;
@@ -57,4 +82,4 @@ const updateVerification = asyncHandler(async (req, res) => {
   res.json({ success: true, data: center });
 });
 
-module.exports = { getCenters, updateVerification };
+module.exports = { getCenters, getHospitals, updateVerification };
