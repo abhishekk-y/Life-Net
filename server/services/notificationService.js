@@ -35,7 +35,7 @@ const broadcastToRole = async (io, { role, type, title, message, link, excludeUs
   const User = require('../models/User');
 
   try {
-    const users = await User.find({ role, isActive: true }).select('_id');
+    const users = await User.find({ role, isActive: true, $or: [{ role: 'ADMIN' }, { verificationStatus: 'APPROVED' }] }).select('_id');
 
     const notifications = await Promise.all(
       users

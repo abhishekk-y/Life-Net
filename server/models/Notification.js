@@ -12,7 +12,8 @@ const notificationSchema = new mongoose.Schema(
       enum: [
         'EMERGENCY', 'REQUEST_UPDATE', 'MATCH_FOUND',
         'BLOOD_EXPIRY_WARNING', 'ORGAN_VIABILITY_WARNING',
-        'APPROVAL_NEEDED', 'SYSTEM', 'INFO',
+        'APPROVAL_NEEDED', 'APPOINTMENT_UPDATE', 'PHARMACY_ORDER',
+        'SUPPLY_ORDER', 'SYSTEM', 'INFO',
       ],
       required: true,
     },

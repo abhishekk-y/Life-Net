@@ -14,6 +14,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const BLOOD_COMPONENTS = ["WHOLE_BLOOD", "PACKED_RBC", "PLATELETS", "PLASMA", "CRYOPRECIPITATE"];
 const ORGAN_TYPES = ["HEART", "LIVER", "KIDNEY", "LUNG", "PANCREAS", "INTESTINE", "CORNEA", "BONE_MARROW", "SKIN", "OTHER"];
 
 const statusColors = {
@@ -23,6 +24,7 @@ const statusColors = {
   IN_TRANSIT: "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400",
   COMPLETED: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400",
   REJECTED: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400",
+  CANCELLED: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
 };
 
 const urgencyColors = {
@@ -38,6 +40,7 @@ const statusIcons = {
   IN_TRANSIT: Truck,
   COMPLETED: CheckCircle2,
   REJECTED: XCircle,
+  CANCELLED: XCircle,
 };
 
 export function Requests() {
@@ -49,19 +52,18 @@ export function Requests() {
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [candidateResults, setCandidateResults] = useState(null);
   const [createLoading, setCreateLoading] = useState(false);
   const [newRequest, setNewRequest] = useState({
     type: "BLOOD",
     urgency: "ROUTINE",
-    resourceDetails: { bloodGroup: "O+", quantity: 1 },
-    patientAge: 30,
-    patientGender: "MALE",
+    resourceDetails: { bloodGroup: "O+", component: "PACKED_RBC", quantity: 1 },
     notes: "",
   });
 
   const fetchRequests = async () => {
     try {
-      setLoading(true);
+
       const data = await api.requests.list();
       const items = data?.requests || data || [];
       setRequests(Array.isArray(items) ? items : []);
@@ -78,12 +80,41 @@ export function Requests() {
   const handleAction = async (id, action, label) => {
     try {
       setActionLoading(id);
-      await api.requests[action](id);
-      toast.success(`Request ${label} successfully`);
-      setSelectedRequest(null);
-      fetchRequests();
+      const updated = await api.requests[action](id);
+      toast.success(`Request ${label}.`);
+      setSelectedRequest((current) => current?._id === id ? { ...current, ...updated } : current);
+      await fetchRequests();
     } catch (error) {
       toast.error(error.message || `Failed to ${label} request`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleFindInventory = async (request) => {
+    try {
+      setActionLoading(request._id);
+      const result = await api.requests.match(request._id);
+      setSelectedRequest(request);
+      setCandidateResults({ requestId: request._id, ...result });
+      if (!result?.candidates?.length) toast.info(result?.alreadyMatched ? 'A center has already assigned inventory.' : 'No matching reported inventory is available right now.');
+    } catch (error) {
+      toast.error(error.message || 'Could not check reported inventory.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAssignInventory = async (requestId, resourceId) => {
+    try {
+      setActionLoading(requestId);
+      const updated = await api.requests.assign(requestId, resourceId);
+      setSelectedRequest((current) => current?._id === requestId ? { ...current, ...updated } : current);
+      setCandidateResults(null);
+      toast.success('Potential inventory assigned. Administrative approval is still required.');
+      await fetchRequests();
+    } catch (error) {
+      toast.error(error.message || 'This inventory could not be assigned.');
     } finally {
       setActionLoading(null);
     }
@@ -93,10 +124,12 @@ export function Requests() {
     e.preventDefault();
     try {
       setCreateLoading(true);
-      await api.requests.create(newRequest);
-      toast.success("Request created successfully!");
+      const payload = { ...newRequest, resourceDetails: { ...newRequest.resourceDetails } };
+      if (!payload.notes?.trim()) delete payload.notes;
+      await api.requests.create(payload);
+      toast.success("Request recorded.");
       setShowCreateDialog(false);
-      setNewRequest({ type: "BLOOD", urgency: "ROUTINE", resourceDetails: { bloodGroup: "O+", quantity: 1 }, patientAge: 30, patientGender: "MALE", notes: "" });
+      setNewRequest({ type: "BLOOD", urgency: "ROUTINE", resourceDetails: { bloodGroup: "O+", component: "PACKED_RBC", quantity: 1 }, notes: "" });
       fetchRequests();
     } catch (error) {
       toast.error(error.message || "Failed to create request");
@@ -122,6 +155,12 @@ export function Requests() {
     completed: requests.filter((r) => r.status === "COMPLETED").length,
   };
 
+  const isAdmin = user?.role === "ADMIN";
+  const isHospital = user?.role === "HOSPITAL";
+  const hospitalOwnsRequest = (request) => String(request?.hospital?._id || request?.hospital || "") === String(user?._id || "");
+  const providerRoleForRequest = (request) => request?.type === "ORGAN" ? "PROCUREMENT_CENTER" : "BLOOD_BANK";
+  const userCanAssign = (request) => isAdmin || (user?.role === providerRoleForRequest(request));
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -143,9 +182,11 @@ export function Requests() {
           <Button variant="outline" size="sm" onClick={fetchRequests} className="rounded-xl border-gray-300 dark:border-gray-700">
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 rounded-xl" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" /> New Request
-          </Button>
+          {(isHospital || isAdmin) && (
+            <Button className="bg-blue-600 hover:bg-blue-700 rounded-xl" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" /> New Request
+            </Button>
+          )}
         </div>
       </div>
 
@@ -231,10 +272,16 @@ export function Requests() {
                         <td className="py-4 px-4">
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" className="text-blue-600 dark:text-blue-400 h-8 px-2" onClick={() => setSelectedRequest(req)}>View</Button>
-                            {req.status === "PENDING" && (
-                              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 px-2 text-xs rounded-lg" disabled={actionLoading === req._id}
+                            {req.status === "PENDING" && (isHospital || isAdmin || user?.role === providerRoleForRequest(req)) && (
+                              <Button size="sm" variant="outline" className="h-8 rounded-lg px-2 text-xs" disabled={actionLoading === req._id}
+                                onClick={() => handleFindInventory(req)}>
+                                {actionLoading === req._id ? <Loader2 className="h-3 w-3 animate-spin" /> : isHospital ? "Find stock" : "Review"}
+                              </Button>
+                            )}
+                            {req.status === "MATCHED" && isAdmin && (
+                              <Button size="sm" className="h-8 rounded-lg bg-emerald-700 px-2 text-xs hover:bg-emerald-800" disabled={actionLoading === req._id}
                                 onClick={() => handleAction(req._id, "approve", "approved")}>
-                                {actionLoading === req._id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Approve"}
+                                Approve
                               </Button>
                             )}
                           </div>
@@ -267,7 +314,7 @@ export function Requests() {
                 <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
                   value={newRequest.type} onChange={(e) => {
                     const type = e.target.value;
-                    setNewRequest({ ...newRequest, type, resourceDetails: type === "ORGAN" ? { organType: "KIDNEY", bloodGroup: "O+" } : { bloodGroup: "O+", quantity: 1 } });
+                    setNewRequest({ ...newRequest, type, resourceDetails: type === "ORGAN" ? { organType: "KIDNEY", bloodGroup: "O+" } : { bloodGroup: "O+", component: "PACKED_RBC", quantity: 1 } });
                   }}>
                   <option value="BLOOD">Blood</option>
                   <option value="ORGAN">Organ</option>
@@ -285,7 +332,7 @@ export function Requests() {
             </div>
 
             {newRequest.type === "BLOOD" ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Blood Group</Label>
                   <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
@@ -294,8 +341,15 @@ export function Requests() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Units Needed</Label>
-                  <Input type="number" min="1" className="rounded-xl" value={newRequest.resourceDetails.quantity || 1}
+                  <Label>Component</Label>
+                  <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    value={newRequest.resourceDetails.component || "PACKED_RBC"} onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, component: e.target.value } })}>
+                    {BLOOD_COMPONENTS.map((component) => <option key={component} value={component}>{component.replace(/_/g, " ")}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Units required</Label>
+                  <Input type="number" min="1" max="500" className="rounded-xl" value={newRequest.resourceDetails.quantity || 1}
                     onChange={(e) => setNewRequest({ ...newRequest, resourceDetails: { ...newRequest.resourceDetails, quantity: parseInt(e.target.value) || 1 } })} />
                 </div>
               </div>
@@ -318,27 +372,11 @@ export function Requests() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Patient Age</Label>
-                <Input type="number" min="0" max="120" className="rounded-xl" value={newRequest.patientAge}
-                  onChange={(e) => setNewRequest({ ...newRequest, patientAge: parseInt(e.target.value) || 0 })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                  value={newRequest.patientGender} onChange={(e) => setNewRequest({ ...newRequest, patientGender: e.target.value })}>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label>Notes</Label>
-              <Input className="rounded-xl" placeholder="Additional details..." value={newRequest.notes}
+              <Label>Operational notes</Label>
+              <Input maxLength={500} className="rounded-xl" placeholder="Do not enter patient or donor names" value={newRequest.notes}
                 onChange={(e) => setNewRequest({ ...newRequest, notes: e.target.value })} />
+              <p className="text-xs text-gray-500 dark:text-gray-400">Only include information needed to coordinate this request.</p>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -353,7 +391,7 @@ export function Requests() {
       </Dialog>
 
       {/* Request Detail Dialog with Workflow */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      <Dialog open={!!selectedRequest} onOpenChange={() => { setSelectedRequest(null); setCandidateResults(null); }}>
         <DialogContent className="sm:max-w-[600px] bg-white dark:bg-gray-900 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between text-gray-900 dark:text-white">
@@ -396,22 +434,62 @@ export function Requests() {
                   <p className="font-semibold text-gray-900 dark:text-white">
                     {selectedRequest.type === "ORGAN"
                       ? selectedRequest.resourceDetails?.organType?.replace(/_/g, " ")
-                      : `${selectedRequest.resourceDetails?.bloodGroup} × ${selectedRequest.resourceDetails?.quantity || 1} units`}
+                      : `${selectedRequest.resourceDetails?.component?.replace(/_/g, " ")} · ${selectedRequest.resourceDetails?.bloodGroup} · ${selectedRequest.resourceDetails?.quantity || 1} unit(s)`}
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Patient</p>
+                  <p className="text-xs text-gray-500 mb-1">Requested quantity</p>
                   <p className="font-semibold text-gray-900 dark:text-white">
-                    Age {selectedRequest.patientAge || "N/A"}, {selectedRequest.patientGender || "N/A"}
+                    {selectedRequest.resourceDetails?.quantity || 1} {selectedRequest.type === "BLOOD" ? "unit(s)" : "request"}
                   </p>
                 </div>
               </div>
+
+              {selectedRequest.fulfilledBy && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/40">
+                  <p className="text-xs font-medium text-emerald-800 dark:text-emerald-200">Assigned center</p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-950 dark:text-emerald-100">{selectedRequest.fulfilledBy.organization || selectedRequest.fulfilledBy.name}</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-800 dark:text-emerald-300">Reported inventory is reserved. Confirm current availability and clinical suitability before approval or transfer.</p>
+                </div>
+              )}
 
               {selectedRequest.notes && (
                 <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-xl">
                   <p className="text-xs font-medium text-amber-900 dark:text-amber-200 mb-1">Notes</p>
                   <p className="text-sm text-amber-800 dark:text-amber-300">{selectedRequest.notes}</p>
                 </div>
+              )}
+
+              {candidateResults?.requestId === selectedRequest._id && (
+                <section className="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-800" aria-live="polite">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Potential inventory</h3>
+                    <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">Shortlisted from reported blood group, component, expiry or viability, and location. This is not a clinical compatibility or allocation decision.</p>
+                  </div>
+                  {candidateResults.candidates?.length ? candidateResults.candidates.map((candidate) => {
+                    const canAssign = userCanAssign(selectedRequest);
+                    const location = [candidate.location?.city, candidate.location?.state].filter(Boolean).join(", ");
+                    return (
+                      <div key={candidate._id} className="flex flex-col gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {candidate.type === "ORGAN" ? candidate.resource?.replace(/_/g, " ") : candidate.resource?.replace(/_/g, " ")} · {candidate.bloodGroup}
+                            {candidate.type === "BLOOD" ? ` · ${candidate.units} unit(s)` : ""}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{candidate.center?.organization || candidate.center?.name || "Participating center"}{location ? ` · ${location}` : ""}</p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{candidate.type === "ORGAN" ? `${candidate.hoursRemaining} hours reported in viability window` : `Reported expiry ${new Date(candidate.expiresAt).toLocaleDateString()}`}</p>
+                        </div>
+                        {canAssign && (
+                          <Button size="sm" disabled={actionLoading === selectedRequest._id} onClick={() => handleAssignInventory(selectedRequest._id, candidate._id)} className="shrink-0 rounded-xl bg-blue-700 hover:bg-blue-800">
+                            {actionLoading === selectedRequest._id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign for review"}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  }) : (
+                    <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">No available inventory currently meets these filters. Availability may change; contact the relevant center directly for time-sensitive requests.</p>
+                  )}
+                </section>
               )}
 
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -421,36 +499,48 @@ export function Requests() {
 
               {/* Workflow Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-800 flex-wrap">
-                {selectedRequest.status === "PENDING" && (
-                  <>
-                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
-                      onClick={() => handleAction(selectedRequest._id, "approve", "approved")}>
-                      {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                      Approve
-                    </Button>
-                    <Button variant="outline" className="rounded-xl border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-                      disabled={actionLoading === selectedRequest._id}
-                      onClick={() => handleAction(selectedRequest._id, "reject", "rejected")}>
-                      <XCircle className="w-4 h-4 mr-2" /> Reject
-                    </Button>
-                  </>
+                {selectedRequest.status === "PENDING" && (isAdmin || (isHospital && hospitalOwnsRequest(selectedRequest)) || user?.role === providerRoleForRequest(selectedRequest)) && (
+                  <Button variant="outline" className="flex-1 rounded-xl" disabled={actionLoading === selectedRequest._id}
+                    onClick={() => handleFindInventory(selectedRequest)}>
+                    {actionLoading === selectedRequest._id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                    {isHospital ? "Find potential inventory" : "Review inventory"}
+                  </Button>
                 )}
-                {selectedRequest.status === "APPROVED" && (
+                {selectedRequest.status === "MATCHED" && isAdmin && (
+                  <Button className="flex-1 rounded-xl bg-emerald-700 hover:bg-emerald-800" disabled={actionLoading === selectedRequest._id}
+                    onClick={() => handleAction(selectedRequest._id, "approve", "approved")}>
+                    {actionLoading === selectedRequest._id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    Approve assignment
+                  </Button>
+                )}
+                {isAdmin && ["PENDING", "MATCHED", "APPROVED"].includes(selectedRequest.status) && (
+                  <Button variant="outline" className="rounded-xl border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                    disabled={actionLoading === selectedRequest._id} onClick={() => handleAction(selectedRequest._id, "reject", "declined")}>
+                    <XCircle className="mr-2 h-4 w-4" /> Decline
+                  </Button>
+                )}
+                {(isHospital && hospitalOwnsRequest(selectedRequest) || isAdmin) && ["PENDING", "MATCHED"].includes(selectedRequest.status) && (
+                  <Button variant="outline" className="rounded-xl" disabled={actionLoading === selectedRequest._id}
+                    onClick={() => handleAction(selectedRequest._id, "cancel", "cancelled")}>
+                    Cancel request
+                  </Button>
+                )}
+                {selectedRequest.status === "APPROVED" && (isAdmin || (user?.role === providerRoleForRequest(selectedRequest) && String(selectedRequest.fulfilledBy?._id || "") === String(user?._id || ""))) && (
                   <Button className="flex-1 bg-orange-600 hover:bg-orange-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
                     onClick={() => handleAction(selectedRequest._id, "transfer", "marked in transit")}>
                     {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Truck className="w-4 h-4 mr-2" />}
-                    Mark In Transit
+                    Mark in transit
                   </Button>
                 )}
-                {selectedRequest.status === "IN_TRANSIT" && (
+                {selectedRequest.status === "IN_TRANSIT" && (isAdmin || (isHospital && hospitalOwnsRequest(selectedRequest))) && (
                   <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl" disabled={actionLoading === selectedRequest._id}
                     onClick={() => handleAction(selectedRequest._id, "complete", "completed")}>
                     {actionLoading === selectedRequest._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                    Mark Completed
+                    Confirm completion
                   </Button>
                 )}
-                {["COMPLETED", "REJECTED"].includes(selectedRequest.status) && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">This request has been {selectedRequest.status.toLowerCase()}.</p>
+                {["COMPLETED", "REJECTED", "CANCELLED"].includes(selectedRequest.status) && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">This request is {selectedRequest.status.toLowerCase()}.</p>
                 )}
               </div>
             </div>

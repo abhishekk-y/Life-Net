@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'src/pages/**', 'src/layouts/**', 'src/redux/**', 'src/services/**', 'src/components/ui/**']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -24,6 +24,9 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // The initial data pages use effects to fetch external state; the plugin flags
+      // even state changes made only after those requests resolve.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

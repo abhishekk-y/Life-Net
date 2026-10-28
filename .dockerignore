@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+**/node_modules
+**/dist
+**/coverage
+*.log
+temp_*
+temp_tuskydv_lifenet
+docs/assets/*.png

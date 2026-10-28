@@ -1,5 +1,6 @@
 const { verifyAccessToken } = require('../utils/jwt');
 const logger = require('../utils/logger');
+const User = require('../models/User');
 
 // Track connected users: Map<userId, Set<socketId>>
 const connectedUsers = new Map();
@@ -10,7 +11,7 @@ const connectedUsers = new Map();
  */
 const initSocket = (io) => {
   // Authentication middleware for socket connections
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) {
       return next(new Error('Authentication required'));
@@ -18,8 +19,12 @@ const initSocket = (io) => {
 
     try {
       const decoded = verifyAccessToken(token);
-      socket.userId = decoded.id;
-      socket.userRole = decoded.role;
+      const user = await User.findById(decoded.id).select('role isActive verificationStatus');
+      if (!user || !user.isActive || (user.role !== 'ADMIN' && user.verificationStatus !== 'APPROVED') || user.role !== decoded.role) {
+        return next(new Error('Account is not authorized for live updates'));
+      }
+      socket.userId = user._id.toString();
+      socket.userRole = user.role;
       next();
     } catch (err) {
       next(new Error('Invalid token'));
@@ -46,22 +51,6 @@ const initSocket = (io) => {
     if (socket.userRole) {
       socket.join(`role:${socket.userRole}`);
     }
-
-    // --- Emergency Alert Handler ---
-    socket.on('emergency:broadcast', (data) => {
-      logger.warn(`🚨 Emergency broadcast from ${userId}: ${JSON.stringify(data)}`);
-      // Broadcast to all connected users
-      io.emit('emergency', {
-        ...data,
-        from: userId,
-        timestamp: new Date(),
-      });
-    });
-
-    // --- Typing indicator for chat (future feature) ---
-    socket.on('typing', (data) => {
-      socket.broadcast.emit('typing', { userId, ...data });
-    });
 
     // --- Disconnect ---
     socket.on('disconnect', () => {

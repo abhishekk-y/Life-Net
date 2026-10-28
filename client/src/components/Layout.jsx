@@ -13,6 +13,13 @@ import {
   Moon,
   Sun,
   User,
+  Stethoscope,
+  CalendarDays,
+  Pill,
+  PackageCheck,
+  Truck,
+  Bell,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./ThemeProvider";
@@ -21,12 +28,21 @@ import { toast } from "sonner";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/categories", label: "Categories", icon: Grid3x3 },
-  { path: "/organs", label: "Organs", icon: Heart },
-  { path: "/requests", label: "Requests", icon: ClipboardList },
-  { path: "/centers", label: "Centers", icon: Building2 },
-  { path: "/blood-bank", label: "Blood Bank", icon: Droplets },
-  { path: "/blood-management", label: "Blood Management", icon: BarChart3 },
+  { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/settings", label: "Account security", icon: Settings },
+  { path: "/analytics", label: "Analytics", icon: BarChart3, roles: ["ADMIN"] },
+  { path: "/requests", label: "Requests", icon: ClipboardList, roles: ["ADMIN", "HOSPITAL", "BLOOD_BANK", "PROCUREMENT_CENTER"] },
+  { path: "/organs", label: "Organ registry", icon: Heart, roles: ["ADMIN", "HOSPITAL", "PROCUREMENT_CENTER"] },
+  { path: "/categories", label: "Organ guide", icon: Grid3x3, roles: ["ADMIN", "HOSPITAL", "PROCUREMENT_CENTER"] },
+  { path: "/blood-bank", label: "Blood inventory", patientLabel: "Blood availability", icon: Droplets, roles: ["ADMIN", "HOSPITAL", "BLOOD_BANK", "PATIENT"] },
+  { path: "/blood-management", label: "Blood overview", icon: BarChart3, roles: ["ADMIN", "BLOOD_BANK"] },
+  { path: "/centers", label: "Partners & verification", icon: Building2, roles: ["ADMIN", "HOSPITAL", "BLOOD_BANK", "PROCUREMENT_CENTER"] },
+  { path: "/doctors", label: "Doctor directory", icon: Stethoscope, roles: ["ADMIN", "PATIENT", "DOCTOR"] },
+  { path: "/appointments", label: "Appointments", icon: CalendarDays, roles: ["ADMIN", "PATIENT", "DOCTOR"] },
+  { path: "/pharmacy", label: "Medicine prices", icon: Pill, roles: ["ADMIN", "PATIENT", "PHARMACY"] },
+  { path: "/pharmacy-orders", label: "Pickup orders", icon: PackageCheck, roles: ["ADMIN", "PATIENT", "PHARMACY"] },
+  { path: "/supplies", label: "Healthcare supplies", icon: Truck, roles: ["ADMIN", "HOSPITAL", "PHARMACY", "BLOOD_BANK", "PROCUREMENT_CENTER", "SUPPLIER"] },
+  { path: "/supply-orders", label: "Supply requests", icon: PackageCheck, roles: ["ADMIN", "HOSPITAL", "PHARMACY", "BLOOD_BANK", "PROCUREMENT_CENTER", "SUPPLIER"] },
 ];
 
 export function Layout() {
@@ -36,16 +52,21 @@ export function Layout() {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    toast.success("Logged out successfully");
+  const handleLogout = async () => {
+    await logout();
+    toast.success("You are signed out.");
     navigate("/login");
   };
 
+  const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(user?.role));
+
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-h-dvh flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 lg:flex-row">
+      <a href="#main-content" className="sr-only z-50 rounded-lg bg-white px-4 py-3 text-sm font-medium text-gray-900 shadow-lg focus:not-sr-only focus:fixed focus:left-4 focus:top-4 dark:bg-gray-900 dark:text-white">
+        Skip to main content
+      </a>
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:flex">
         <div className="flex items-center gap-2 px-6 py-6 border-b border-gray-200 dark:border-gray-800">
           <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
             <Heart className="w-6 h-6 text-white" fill="white" />
@@ -58,14 +79,15 @@ export function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1">
-          {navItems.map((item) => {
+        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
               <Link
                 key={item.path}
                 to={item.path}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                   isActive
                     ? "bg-blue-600 text-white"
@@ -73,7 +95,7 @@ export function Layout() {
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span>{user?.role === "PATIENT" ? (item.patientLabel || item.label) : item.label}</span>
               </Link>
             );
           })}
@@ -98,6 +120,7 @@ export function Layout() {
             </div>
           )}
           <button
+            type="button"
             onClick={toggleTheme}
             className="flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors w-full"
           >
@@ -109,6 +132,7 @@ export function Layout() {
             <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
           </button>
           <button
+            type="button"
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors w-full"
           >
@@ -119,7 +143,7 @@ export function Layout() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <header className="sticky top-0 z-50 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 lg:hidden">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -129,6 +153,7 @@ export function Layout() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={toggleTheme}
               className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
@@ -139,6 +164,10 @@ export function Layout() {
               )}
             </button>
             <button
+              type="button"
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
+              aria-label={isMobileMenuOpen ? "Close navigation" : "Open navigation"}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
@@ -153,14 +182,15 @@ export function Layout() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <nav className="px-4 py-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 space-y-1">
-            {navItems.map((item) => {
+          <nav id="mobile-navigation" aria-label="Main navigation" className="space-y-1 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                     isActive
@@ -169,11 +199,12 @@ export function Layout() {
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
+                  <span>{user?.role === "PATIENT" ? (item.patientLabel || item.label) : item.label}</span>
                 </Link>
               );
             })}
             <button
+              type="button"
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 handleLogout();
@@ -185,11 +216,11 @@ export function Layout() {
             </button>
           </nav>
         )}
-      </div>
+      </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto pt-16 lg:pt-0">
-        <div className="p-4 lg:p-8">
+      <main id="main-content" className="min-w-0 flex-1 overflow-auto scroll-smooth">
+        <div className="mx-auto w-full max-w-[1440px] p-4 sm:p-6 lg:p-9">
           <Outlet />
         </div>
       </main>

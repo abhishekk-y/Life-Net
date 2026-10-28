@@ -16,6 +16,11 @@ const requestSchema = new mongoose.Schema(
       enum: REQUEST_STATUS,
       default: 'PENDING',
     },
+    matching: {
+      type: Boolean,
+      default: false,
+      select: false,
+    },
     urgency: {
       type: String,
       enum: URGENCY_LEVELS,
@@ -27,12 +32,6 @@ const requestSchema = new mongoose.Schema(
       organType: String,
       component: String, // For blood requests
       quantity: Number,
-    },
-    // Patient info (anonymized)
-    patientAge: Number,
-    patientGender: {
-      type: String,
-      enum: ['MALE', 'FEMALE', 'OTHER'],
     },
     // Who is requesting
     requestedBy: {
@@ -84,17 +83,6 @@ const requestSchema = new mongoose.Schema(
 requestSchema.index({ status: 1, type: 1, urgency: 1 });
 requestSchema.index({ requestedBy: 1 });
 requestSchema.index({ hospital: 1 });
-
-// Auto-add to status history on status change
-requestSchema.pre('save', function (next) {
-  if (this.isModified('status')) {
-    this.statusHistory.push({
-      status: this.status,
-      changedAt: new Date(),
-    });
-  }
-  next();
-});
 
 module.exports = mongoose.model('Request', requestSchema);
 module.exports.REQUEST_TYPES = REQUEST_TYPES;

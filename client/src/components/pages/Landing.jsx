@@ -1,350 +1,240 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { NetworkMap } from "../ui/NetworkMap";
+import { createElement } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Heart, Users, Activity, TrendingUp, ArrowRight, Droplets, Building2,
-  Clock, Shield, Moon, Sun, CheckCircle2, Zap, Globe, Bell, ChevronRight,
-} from "lucide-react";
-import { Button } from "../ui/button";
-import { Card, CardContent } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { useTheme } from "../ThemeProvider";
+  ArrowDownRight, ArrowRight, Building2, Check, ClipboardCheck,
+  Droplets, Heart, Moon, ShieldCheck, Sun, TimerReset, Stethoscope, Pill,
+} from 'lucide-react';
+import { Button } from '../ui/button';
+import { useTheme } from '../ThemeProvider';
 
-const stats = [
-  { value: "8+",    label: "Network Centers",   icon: Building2,   color: "text-blue-600 dark:text-blue-400",   bg: "bg-blue-50 dark:bg-blue-950" },
-  { value: "30+",   label: "Organs Available",  icon: Heart,       color: "text-rose-600 dark:text-rose-400",   bg: "bg-rose-50 dark:bg-rose-950" },
-  { value: "40+",   label: "Blood Units",       icon: Droplets,    color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-950" },
-  { value: "99.8%", label: "Uptime SLA",        icon: TrendingUp,  color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950" },
-];
-
-const features = [
+const capabilities = [
   {
-    icon: Zap,
-    title: "Real-Time Emergency Alerts",
-    description: "Socket.io powered instant notifications when critical organs become available. Sub-second latency across the entire network.",
-    badge: "Live",
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-50 dark:bg-amber-950",
+    icon: Droplets,
+    title: 'Blood inventory',
+    description: 'Track blood group, component, storage temperature, quantity, and expiry date at each participating bank.',
+    number: '01',
   },
   {
     icon: Heart,
-    title: "Smart Organ Matching",
-    description: "Blood group, HLA compatibility, viability window, and geographic proximity — all factored into every match automatically.",
-    badge: "AI-Powered",
-    color: "text-rose-600 dark:text-rose-400",
-    bg: "bg-rose-50 dark:bg-rose-950",
+    title: 'Organ registry',
+    description: 'Record availability and viability windows so clinical teams can review potentially relevant listings.',
+    number: '02',
   },
   {
-    icon: Droplets,
-    title: "Blood Bank Management",
-    description: "Track 40+ units across 8 blood groups and 5 components. Expiry alerts before critical shortages occur.",
-    badge: "Analytics",
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-50 dark:bg-blue-950",
+    icon: ClipboardCheck,
+    title: 'Request coordination',
+    description: 'Keep requests, resource matches, approvals, transfers, and completion status in one auditable record.',
+    number: '03',
   },
   {
-    icon: Shield,
-    title: "JWT Role-Based Security",
-    description: "Hospitals, blood banks, procurement centers and admins each get scoped access. HIPAA-grade data protection built in.",
-    badge: "Secure",
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-50 dark:bg-emerald-950",
+    icon: Building2,
+    title: 'Reviewed care network',
+    description: 'Review center applications before accounts can access operational inventory and request workflows.',
+    number: '04',
   },
   {
-    icon: Activity,
-    title: "Full Workflow Tracking",
-    description: "Every request moves through Pending → Matched → Approved → In Transit → Completed with one-click actions.",
-    badge: "Workflow",
-    color: "text-purple-600 dark:text-purple-400",
-    bg: "bg-purple-50 dark:bg-purple-950",
+    icon: Stethoscope,
+    title: 'Doctor appointments',
+    description: 'Patients can browse clinician profiles approved for LifeNet and request an available in-person appointment time.',
+    number: '05',
   },
   {
-    icon: Globe,
-    title: "Multi-Center Network",
-    description: "NOTTO, ZOTTO, AIIMS, Apollo, Fortis and 50+ centres — all on one unified platform with real-time inventory sync.",
-    badge: "National",
-    color: "text-cyan-600 dark:text-cyan-400",
-    bg: "bg-cyan-50 dark:bg-cyan-950",
+    icon: Pill,
+    title: 'Pharmacy prices',
+    description: 'Compare same-product listings from pharmacies approved for LifeNet and send a pickup request.',
+    number: '06',
   },
 ];
 
-const steps = [
-  { num: "01", title: "Register Your Center", desc: "Hospitals, blood banks and procurement centers onboard in minutes with role-based access configured automatically." },
-  { num: "02", title: "List & Monitor Resources", desc: "Add organs with viability timers, blood units with expiry tracking — the system alerts your team before time runs out." },
-  { num: "03", title: "Receive & Act on Requests", desc: "EMERGENCY, URGENT and ROUTINE requests land in real-time. Approve, transfer, complete — all from one screen." },
-  { num: "04", title: "Track to Completion", desc: "Full audit trail from procurement to transplant. Every action logged for compliance and accountability." },
-];
-
-const urgencyItems = [
-  { type: "HEART", blood: "O+", city: "Delhi", time: "3h left", urgent: true },
-  { type: "KIDNEY", blood: "A+", city: "Chennai", time: "18h left", urgent: false },
-  { type: "O- Blood", blood: "O-", city: "Mumbai", time: "Emergency", urgent: true },
-  { type: "LIVER", blood: "B+", city: "Bangalore", time: "8h left", urgent: false },
+const workflow = [
+  ['Join', 'Patients sign up directly; providers submit their credentials.'],
+  ['Verify', 'An administrator reviews each healthcare provider account.'],
+  ['Connect', 'Patients find providers while centers coordinate resources.'],
+  ['Follow through', 'Appointments, pickup orders, and resource requests show their status.'],
 ];
 
 export function Landing() {
   const { theme, toggleTheme } = useTheme();
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setTick(v => v + 1), 3000);
-    return () => clearInterval(t);
-  }, []);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f8f5] text-[#172a2b] dark:bg-gray-950 dark:text-gray-100">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+      <header className="sticky top-0 z-40 border-b border-[#dce5df] bg-[#f7f8f5]/90 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
+        <nav aria-label="Main navigation" className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between px-5 sm:px-8">
+          <Link to="/" className="inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-[#143b3a] text-white"><Heart size={19} fill="currentColor" /></span>
+            <span>
+              <span className="block text-base font-semibold tracking-tight">LifeNet</span>
+              <span className="block text-[0.68rem] tracking-wide text-[#5c706d] dark:text-gray-400">CARE NETWORK</span>
+            </span>
+          </Link>
 
-      {/* ── Navigation ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-800/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/30">
-                <Heart className="w-5 h-5 text-white" fill="white" />
+          <div className="hidden items-center gap-8 md:flex">
+            <a href="#capabilities" className="text-sm font-medium text-[#536765] transition hover:text-[#143b3a] dark:text-gray-300 dark:hover:text-white">Capabilities</a>
+            <a href="#workflow" className="text-sm font-medium text-[#536765] transition hover:text-[#143b3a] dark:text-gray-300 dark:hover:text-white">How access works</a>
+            <a href="#principles" className="text-sm font-medium text-[#536765] transition hover:text-[#143b3a] dark:text-gray-300 dark:hover:text-white">Care principles</a>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#536765] transition hover:bg-[#eaf0eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <Link to="/login">
+              <Button className="h-10 rounded-xl bg-[#143b3a] px-4 text-sm text-white hover:bg-[#1d514e]">
+                Sign in <ArrowRight size={15} className="ml-2" />
+              </Button>
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      <main id="main-content">
+        <section className="relative border-b border-[#dce5df] dark:border-gray-800">
+          <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16 lg:py-28">
+            <div className="relative z-10 max-w-2xl">
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#c8d9d1] bg-white/75 px-3.5 py-2 text-xs font-semibold text-[#315b53] shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-emerald-200">
+                <span className="h-2 w-2 rounded-full bg-[#548e73]" />
+                Patient services and approved provider tools
               </div>
-              <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">LifeNet</span>
-            </div>
-
-            <div className="hidden md:flex items-center gap-8">
-              {["Features", "How it Works"].map(l => (
-                <a key={l} href={`#${l.toLowerCase().replace(/ /g,"-")}`}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium">
-                  {l}
-                </a>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={toggleTheme}
-                className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors">
-                {theme === "dark"
-                  ? <Sun className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                  : <Moon className="w-4 h-4 text-gray-600" />}
-              </button>
-              <Link to="/login">
-                <Button className="bg-blue-600 hover:bg-blue-700 rounded-xl h-9 px-5 text-sm shadow-lg shadow-blue-600/25">
-                  Sign In <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* ── Hero ── */}
-      <section className="relative pt-28 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background gradient orbs */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-400/10 dark:bg-blue-600/10 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-1/4 w-80 h-80 bg-rose-400/10 dark:bg-rose-600/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-800 to-transparent" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 rounded-full text-sm mb-8 font-medium">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              Live Network — 8 Centers Online
-            </div>
-
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-6 leading-tight tracking-tight">
-              India's Organ &{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-500">
-                Blood Network
-              </span>
-              <br />Management Platform
-            </h1>
-
-            <p className="text-xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Connecting AIIMS, Apollo, Fortis, NOTTO, Red Cross and 50+ centers for real-time organ procurement,
-              blood inventory, and emergency request coordination.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-              <Link to="/login">
-                <Button className="bg-blue-600 hover:bg-blue-700 rounded-2xl h-14 px-10 text-base shadow-xl shadow-blue-600/30 font-semibold">
-                  Access Platform <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-              <a href="#how-it-works">
-                <Button variant="outline" className="rounded-2xl h-14 px-10 text-base border-gray-200 dark:border-gray-700 font-semibold">
-                  See How It Works
-                </Button>
-              </a>
-            </div>
-
-            {/* Live Feed Card */}
-            <div className="max-w-lg mx-auto">
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-xl">
-                <div className="flex items-center gap-2 mb-3">
-                  <Bell className="w-4 h-4 text-rose-500 animate-pulse" />
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Live Network Feed</span>
-                  <Badge className="ml-auto bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-full text-xs">Live</Badge>
-                </div>
-                
-                {/* Embedded Mini Network Map */}
-                <div className="mb-4 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800">
-                  <NetworkMap />
-                </div>
-
-                <div className="space-y-2">
-                  {urgencyItems.map((item, i) => (
-                    <div key={i}
-                      className={`flex items-center justify-between p-2.5 rounded-xl text-sm transition-all duration-500 ${i === tick % 4 ? "bg-blue-50 dark:bg-blue-950/50 ring-1 ring-blue-200 dark:ring-blue-800" : "bg-gray-50 dark:bg-gray-800/50"}`}>
-                      <div className="flex items-center gap-2">
-                        {item.type.includes("Blood")
-                          ? <Droplets className="w-3.5 h-3.5 text-red-500" />
-                          : <Heart className="w-3.5 h-3.5 text-rose-500" />}
-                        <span className="font-medium text-gray-900 dark:text-white">{item.type}</span>
-                        <Badge variant="outline" className="text-[10px] font-mono">{item.blood}</Badge>
-                        <span className="text-gray-500 dark:text-gray-400">{item.city}</span>
-                      </div>
-                      <Badge className={`text-[10px] rounded-full ${item.urgent ? "bg-red-600 text-white" : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400"}`}>
-                        {item.time}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-16">
-            {stats.map(s => (
-              <Card key={s.label} className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md transition-shadow">
-                <CardContent className="p-6 text-center">
-                  <div className={`w-12 h-12 ${s.bg} rounded-xl flex items-center justify-center mx-auto mb-3`}>
-                    <s.icon className={`w-6 h-6 ${s.color}`} />
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{s.value}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{s.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ── */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <Badge className="mb-4 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-full">Platform Features</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Built for Medical Professionals
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">
-              Every feature designed for the high-stakes environment of organ procurement and blood management
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map(f => (
-              <Card key={f.title}
-                className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-                <CardContent className="p-6">
-                  <div className={`w-12 h-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
-                    <f.icon className={`w-6 h-6 ${f.color}`} />
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{f.title}</h3>
-                    <Badge className="rounded-full text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{f.badge}</Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{f.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <Badge className="mb-4 bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 rounded-full">Workflow</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">How LifeNet Works</h2>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">From organ procurement to transplant — every step coordinated in real time</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {steps.map((step, i) => (
-              <div key={step.num} className="relative">
-                {i < steps.length - 1 && (
-                  <div className="hidden lg:block absolute top-8 left-full w-full h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent z-10" />
-                )}
-                <Card className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-md transition-shadow h-full">
-                  <CardContent className="p-6">
-                    <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-blue-600/25">
-                      <span className="text-white font-bold text-sm">{step.num}</span>
-                    </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{step.title}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{step.desc}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-
-      {/* ── CTA ── */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-600 to-blue-700 p-12 text-center shadow-2xl shadow-blue-600/30">
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full" />
-              <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/5 rounded-full" />
-            </div>
-            <div className="relative">
-              <Badge className="mb-6 bg-white/20 text-white border-white/20 rounded-full">Get Started Today</Badge>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Every Minute Counts
-              </h2>
-              <p className="text-blue-100 mb-8 text-lg max-w-xl mx-auto">
-                A heart has 4–6 hours. A kidney has 36. LifeNet ensures
-                that every viable organ finds its recipient — in time.
+              <h1 className="max-w-[12ch] text-[2.8rem] font-semibold leading-[1.06] tracking-[-0.045em] sm:text-6xl lg:text-[4.25rem]">
+                One network for everyday care and critical coordination.
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-[#5b6d69] dark:text-gray-300 sm:text-lg sm:leading-8">
+                LifeNet connects patient access to approved doctors and pharmacies with the inventory and request tools care organizations use to coordinate blood and organ resources.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/login">
-                  <Button className="bg-white text-blue-600 hover:bg-blue-50 rounded-2xl h-14 px-10 text-base font-bold shadow-xl">
-                    Access Platform Now <ChevronRight className="w-5 h-5 ml-1" />
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <Link to="/register">
+                  <Button className="h-12 w-full rounded-xl bg-[#143b3a] px-6 text-white hover:bg-[#1d514e] sm:w-auto">
+                    Create an account <ArrowRight size={16} className="ml-2" />
                   </Button>
                 </Link>
+                <a href="#capabilities">
+                  <Button variant="outline" className="h-12 w-full rounded-xl border-[#cbd8d2] bg-transparent px-6 text-[#284642] hover:bg-[#edf2ef] dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800 sm:w-auto">
+                    Explore capabilities <ArrowDownRight size={16} className="ml-2" />
+                  </Button>
+                </a>
               </div>
-              <div className="flex items-center justify-center gap-6 mt-8">
-                {["JWT Secured", "HIPAA Compliant", "24/7 Uptime"].map(f => (
-                  <div key={f} className="flex items-center gap-1.5 text-blue-100 text-sm">
-                    <CheckCircle2 className="w-4 h-4" /> {f}
-                  </div>
-                ))}
-              </div>
+              <p className="mt-5 text-xs leading-5 text-[#788985] dark:text-gray-500">Email verification activates patient accounts. Provider accounts also require administrator review.</p>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ── Footer ── */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Heart className="w-4 h-4 text-white" fill="white" />
+            <div className="relative mx-auto w-full max-w-[34rem] lg:ml-auto">
+              <div aria-hidden="true" className="absolute -left-10 -top-10 h-36 w-36 rounded-full bg-[#dbe9df] blur-2xl dark:bg-teal-950/50" />
+              <div className="relative overflow-hidden rounded-[2rem] border border-[#cfddd5] bg-[#e8efea] p-4 shadow-[0_28px_80px_-50px_rgba(25,67,56,.5)] dark:border-gray-700 dark:bg-gray-900 sm:p-6">
+                <div className="flex items-center justify-between border-b border-[#d0ddd5] pb-4 dark:border-gray-700">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#678078] dark:text-gray-400">Request pathway</p>
+                    <p className="mt-1 text-lg font-semibold tracking-tight">A shared operational view</p>
+                  </div>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#315e50] shadow-sm dark:bg-gray-800 dark:text-emerald-200"><ClipboardCheck size={18} /></span>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-[#d4e0d8] bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f9e8e6] text-[#a94a45]"><Droplets size={18} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">Resource request</p>
+                      <p className="mt-0.5 text-xs text-[#788985] dark:text-gray-400">Status and responsible center stay visible</p>
+                    </div>
+                    <span className="rounded-md bg-[#f5f0df] px-2 py-1 text-[0.65rem] font-semibold text-[#79652f]">TRACKED</span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-4 gap-2">
+                    {['Request', 'Match', 'Approve', 'Resolve'].map((step, index) => (
+                      <div key={step} className="relative">
+                        <div className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${index === 0 ? 'bg-[#1f5a50] text-white' : 'bg-[#edf2ef] text-[#778983] dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {index === 0 ? <Check size={14} /> : index + 1}
+                        </div>
+                        <p className="mt-2 text-center text-[0.65rem] font-medium text-[#647670] dark:text-gray-400">{step}</p>
+                        {index < 3 && <span aria-hidden="true" className="absolute left-[calc(50%+1rem)] top-3.5 h-px w-[calc(100%-1rem)] bg-[#d7e1db] dark:bg-gray-700" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-[#153d3b] p-4 text-white">
+                    <TimerReset size={18} className="text-emerald-200" />
+                    <p className="mt-4 text-sm font-semibold">Time-sensitive listings</p>
+                    <p className="mt-1 text-xs leading-5 text-emerald-50/70">Expiry and viability details remain part of the record.</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#d4e0d8] bg-white p-4 dark:border-gray-700 dark:bg-gray-950">
+                    <ShieldCheck size={18} className="text-[#477b64] dark:text-emerald-300" />
+                    <p className="mt-4 text-sm font-semibold">Provider review</p>
+                    <p className="mt-1 text-xs leading-5 text-[#788985] dark:text-gray-400">Center applications require review before use.</p>
+                  </div>
+                </div>
               </div>
-              <span className="font-bold text-gray-900 dark:text-white">LifeNet</span>
-              <span className="text-gray-400 dark:text-gray-600 mx-2">—</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">Smart Organ & Blood Management System</span>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              © {new Date().getFullYear()} LifeNet. Built for India's healthcare network.
-            </p>
           </div>
-        </div>
-      </footer>
+        </section>
+
+        <section id="capabilities" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
+          <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20">
+            <div className="max-w-md">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#487665] dark:text-emerald-300">Built around coordination</p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Connected services for patients and care teams.</h2>
+              <p className="mt-4 text-sm leading-7 text-[#62736f] dark:text-gray-400">A role-based workspace joins appointment access, pharmacy listings, inventory updates, and the requests that depend on them.</p>
+            </div>
+            <div className="grid gap-x-10 sm:grid-cols-2">
+              {capabilities.map(({ icon, title, description, number }) => (
+                <article key={number} className="border-t border-[#d5e0d9] py-6 dark:border-gray-800">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e7f0e9] text-[#386e59] dark:bg-emerald-950/60 dark:text-emerald-200">{createElement(icon, { size: 18 })}</span>
+                    <span className="font-mono text-xs text-[#92a19b]">{number}</span>
+                  </div>
+                  <h3 className="mt-5 text-base font-semibold">{title}</h3>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-[#687a75] dark:text-gray-400">{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="workflow" className="scroll-mt-24 border-y border-[#d5e0d9] bg-[#edf2ee] dark:border-gray-800 dark:bg-gray-900/60">
+          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
+            <div className="max-w-xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#487665] dark:text-emerald-300">How access works</p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">A clear path from application to resolution.</h2>
+            </div>
+            <ol className="mt-12 grid gap-0 border-t border-[#cddbd2] sm:grid-cols-2 lg:grid-cols-4 dark:border-gray-700">
+              {workflow.map(([title, description], index) => (
+                <li key={title} className="border-b border-[#cddbd2] py-6 sm:border-b-0 sm:border-r sm:px-6 sm:first:pl-0 lg:py-8 dark:border-gray-700">
+                  <span className="font-mono text-xs text-[#6b8b7d]">0{index + 1}</span>
+                  <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                  <p className="mt-2 max-w-[15rem] text-sm leading-6 text-[#657771] dark:text-gray-400">{description}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section id="principles" className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[1fr_0.8fr] lg:items-center">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#487665] dark:text-emerald-300">Care principles</p>
+            <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Useful information, with the right limits.</h2>
+          </div>
+          <div className="space-y-4 text-sm leading-6 text-[#62736f] dark:text-gray-400">
+            <p>Inventory reflects what participating centers report and may change. A center must confirm current availability, suitability, and transfer details.</p>
+            <p>LifeNet supports coordination and record keeping. It does not replace medical judgment, determine transplant eligibility, or promise emergency response.</p>
+            <p>Reported stock and availability can change. Clinicians, pharmacists, and authorized transplant teams confirm suitability and make all care and allocation decisions.</p>
+          </div>
+        </section>
+
+        <footer className="border-t border-[#d5e0d9] dark:border-gray-800">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 text-xs text-[#71827c] dark:text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <Link to="/" className="inline-flex items-center gap-2 font-semibold text-[#31584e] dark:text-gray-300"><Heart size={15} /> LifeNet</Link>
+            <p>For healthcare organizations approved for LifeNet. For emergencies, contact local emergency services.</p>
+            <div className="flex gap-5 text-sm">
+              <Link to="/login" className="hover:text-[#143b3a] dark:hover:text-white">Sign in</Link>
+              <Link to="/register" className="hover:text-[#143b3a] dark:hover:text-white">Request access</Link>
+            </div>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }

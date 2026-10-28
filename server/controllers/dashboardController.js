@@ -5,6 +5,7 @@ const Request = require('../models/Request');
 const AuditLog = require('../models/AuditLog');
 const Notification = require('../models/Notification');
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 
 /**
  * @desc    Get dashboard statistics
@@ -12,26 +13,52 @@ const asyncHandler = require('../utils/asyncHandler');
  * @access  Protected
  */
 const getStats = asyncHandler(async (req, res) => {
+  const utcToday = new Date();
+  utcToday.setUTCHours(0, 0, 0, 0);
+  let requestFilter = {};
+  if (req.user.role === 'HOSPITAL') requestFilter = { hospital: req.user._id };
+  else if (req.user.role === 'BLOOD_BANK') requestFilter = { type: 'BLOOD' };
+  else if (req.user.role === 'PROCUREMENT_CENTER') requestFilter = { type: 'ORGAN' };
+  else if (req.user.role !== 'ADMIN') requestFilter = { requestedBy: req.user._id };
+
   const [
     totalOrgans,
     availableOrgans,
-    totalBloodUnits,
-    availableBlood,
+    bloodStats,
     totalRequests,
-    pendingRequests,
+    activeRequests,
     completedRequests,
     emergencyRequests,
     totalUsers,
   ] = await Promise.all([
     Organ.countDocuments(),
-    Organ.countDocuments({ status: 'AVAILABLE' }),
-    BloodUnit.countDocuments(),
-    BloodUnit.countDocuments({ status: 'AVAILABLE', expiryDate: { $gt: new Date() } }),
-    Request.countDocuments(),
-    Request.countDocuments({ status: 'PENDING' }),
-    Request.countDocuments({ status: 'COMPLETED' }),
-    Request.countDocuments({ urgency: 'EMERGENCY' }),
-    User.countDocuments({ isActive: true }),
+    Organ.countDocuments({
+      status: 'AVAILABLE',
+      $expr: {
+        $gt: [
+          { $add: ['$harvestedAt', { $multiply: ['$viabilityHours', 3600000] }] },
+          new Date(),
+        ],
+      },
+    }),
+    BloodUnit.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUnits: { $sum: { $ifNull: ['$units', 1] } },
+          availableUnits: {
+            $sum: {
+              $cond: [{ $and: [{ $eq: ['$status', 'AVAILABLE'] }, { $gte: ['$expiryDate', utcToday] }] }, { $ifNull: ['$units', 1] }, 0],
+            },
+          },
+        },
+      },
+    ]),
+    Request.countDocuments(requestFilter),
+    Request.countDocuments({ ...requestFilter, status: { $in: ['PENDING', 'MATCHED', 'APPROVED', 'IN_TRANSIT'] } }),
+    Request.countDocuments({ ...requestFilter, status: 'COMPLETED' }),
+    Request.countDocuments({ ...requestFilter, urgency: 'EMERGENCY', status: { $nin: ['REJECTED', 'CANCELLED'] } }),
+    req.user.role === 'ADMIN' ? User.countDocuments({ isActive: true }) : Promise.resolve(null),
   ]);
 
   const successRate = totalRequests > 0
@@ -42,10 +69,10 @@ const getStats = asyncHandler(async (req, res) => {
     success: true,
     data: {
       organs: { total: totalOrgans, available: availableOrgans },
-      blood: { total: totalBloodUnits, available: availableBlood },
+      blood: { total: bloodStats[0]?.totalUnits || 0, available: bloodStats[0]?.availableUnits || 0 },
       requests: {
         total: totalRequests,
-        pending: pendingRequests,
+        active: activeRequests,
         completed: completedRequests,
         emergency: emergencyRequests,
         successRate,
@@ -61,9 +88,10 @@ const getStats = asyncHandler(async (req, res) => {
  * @access  Protected
  */
 const getActivity = asyncHandler(async (req, res) => {
-  const { limit = 20 } = req.query;
+  const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const filter = req.user.role === 'ADMIN' ? {} : { performedBy: req.user._id };
 
-  const logs = await AuditLog.find()
+  const logs = await AuditLog.find(filter)
     .populate('performedBy', 'name role organization')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit));
@@ -93,12 +121,14 @@ const getAnalytics = asyncHandler(async (req, res) => {
   ]);
 
   // Blood group distribution
+  const utcToday = new Date();
+  utcToday.setUTCHours(0, 0, 0, 0);
   const bloodDistribution = await BloodUnit.aggregate([
-    { $match: { status: 'AVAILABLE' } },
+    { $match: { status: 'AVAILABLE', expiryDate: { $gte: utcToday } } },
     {
       $group: {
         _id: '$bloodGroup',
-        count: { $sum: '$units' },
+        count: { $sum: { $ifNull: ['$units', 1] } },
       },
     },
     { $sort: { _id: 1 } },
@@ -110,7 +140,14 @@ const getAnalytics = asyncHandler(async (req, res) => {
       $group: {
         _id: '$organType',
         total: { $sum: 1 },
-        available: { $sum: { $cond: [{ $eq: ['$status', 'AVAILABLE'] }, 1, 0] } },
+        available: {
+          $sum: {
+            $cond: [{ $and: [
+              { $eq: ['$status', 'AVAILABLE'] },
+              { $gt: [{ $add: ['$harvestedAt', { $multiply: ['$viabilityHours', 3600000] }] }, new Date()] },
+            ] }, 1, 0],
+          },
+        },
       },
     },
     { $sort: { _id: 1 } },
@@ -154,23 +191,26 @@ const getAnalytics = asyncHandler(async (req, res) => {
  * @access  Protected
  */
 const getNotifications = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const skip = (page - 1) * limit;
 
   const [notifications, total, unreadCount] = await Promise.all([
     Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit)),
+      .limit(limit),
     Notification.countDocuments({ recipient: req.user._id }),
     Notification.countDocuments({ recipient: req.user._id, isRead: false }),
   ]);
 
   res.json({
     success: true,
-    data: notifications,
-    unreadCount,
-    pagination: { total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) },
+    data: {
+      notifications,
+      unreadCount,
+      pagination: { total, page, pages: Math.ceil(total / limit) },
+    },
   });
 });
 
@@ -180,7 +220,10 @@ const getNotifications = asyncHandler(async (req, res) => {
  * @access  Protected
  */
 const markNotificationsRead = asyncHandler(async (req, res) => {
-  const { ids } = req.body; // Array of notification IDs, or [] for all
+  const { ids } = req.body;
+  if (ids !== undefined && (!Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id)))) {
+    throw ApiError.badRequest('Notification IDs must be a list of at most 100 valid IDs.');
+  }
 
   const filter = { recipient: req.user._id, isRead: false };
   if (ids && ids.length > 0) {

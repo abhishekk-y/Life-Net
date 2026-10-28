@@ -1,226 +1,38 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { api } from "../../lib/api";
-import { Progress } from "../ui/progress";
-import { Button } from "../ui/button";
-import { BarChart3, Droplets, TrendingUp, TrendingDown, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, Clock3, Droplets, RefreshCw, Thermometer } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '../../lib/api';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
 
-// Simulated AI predictive data for the next 7 days
-const predictiveData = [
-  { day: "Mon", stock: 120, predicted_demand: 110 },
-  { day: "Tue", stock: 115, predicted_demand: 130 },
-  { day: "Wed", stock: 95, predicted_demand: 140 },
-  { day: "Thu", stock: 80, predicted_demand: 155 },
-  { day: "Fri", stock: 65, predicted_demand: 180 },
-  { day: "Sat", stock: 40, predicted_demand: 190 },
-  { day: "Sun", stock: 25, predicted_demand: 210 },
-];
-
-
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const label = (value) => String(value || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 export function BloodManagement() {
-  const [bloodUnits, setBloodUnits] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [unitsData, summaryData] = await Promise.allSettled([
-        api.blood.list(),
-        api.blood.summary(),
-      ]);
-      if (unitsData.status === "fulfilled") {
-        const items = unitsData.value?.bloodUnits || unitsData.value || [];
-        setBloodUnits(Array.isArray(items) ? items : []);
-      }
-      if (summaryData.status === "fulfilled") {
-        setSummary(summaryData.value);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+    try { setReport(await api.blood.summary()); }
+    catch (error) { toast.error(error.message || 'Could not load the current blood stock summary.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const totals = report?.totals || {};
 
-  useEffect(() => { fetchData(); }, []);
-
-  // Compute analytics
-  const analytics = BLOOD_GROUPS.map((bg) => {
-    const units = bloodUnits.filter((u) => u.bloodGroup === bg);
-    const available = units.filter((u) => u.status === "AVAILABLE").length;
-    const reserved = units.filter((u) => u.status === "RESERVED").length;
-    const expired = units.filter((u) => u.status === "EXPIRED").length;
-    const expiringSoon = units.filter((u) => {
-      if (!u.expiryDate) return false;
-      const days = (new Date(u.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-      return days > 0 && days < 7;
-    }).length;
-    const totalQty = units.reduce((s, u) => s + (u.quantity || 0), 0);
-    const health = units.length === 0 ? 0 : available === 0 ? 10 : Math.round((available / units.length) * 100);
-    return { bloodGroup: bg, total: units.length, available, reserved, expired, expiringSoon, totalQty, health };
-  });
-
-  const totalAvailable = analytics.reduce((s, a) => s + a.available, 0);
-  const totalExpiring = analytics.reduce((s, a) => s + a.expiringSoon, 0);
-  const totalExpired = analytics.reduce((s, a) => s + a.expired, 0);
-  const totalQty = analytics.reduce((s, a) => s + a.totalQty, 0);
-
-  const healthColor = (h) => h >= 60 ? "bg-emerald-500" : h >= 30 ? "bg-amber-500" : "bg-red-500";
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Blood Management</h1>
-          <p className="text-gray-500 dark:text-gray-400">Analytics and health metrics for blood inventory</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchData} className="rounded-xl border-gray-300 dark:border-gray-700">
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-        </Button>
-      </div>
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Volume", value: `${(totalQty / 1000).toFixed(1)}L`, icon: Droplets, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
-          { label: "Available Units", value: totalAvailable, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950" },
-          { label: "Expiring Soon", value: totalExpiring, icon: AlertTriangle, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950" },
-          { label: "Expired Units", value: totalExpired, icon: TrendingDown, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950" },
-        ].map((k) => (
-          <Card key={k.label} className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className={`w-10 h-10 ${k.bg} rounded-xl flex items-center justify-center`}>
-                <k.icon className={`w-5 h-5 ${k.color}`} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{k.value}</p>
-                <p className="text-xs text-gray-500">{k.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* AI Predictive Analytics Chart */}
-      <Card className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20">
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-            <TrendingDown className="w-5 h-5 text-purple-500" />
-            AI Forecast: 7-Day Stock Depletion
-            <Badge variant="outline" className="ml-auto bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 text-xs gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-              Machine Learning Model Active
-            </Badge>
-          </CardTitle>
-          <p className="text-sm text-gray-500 mt-1">Predictive trajectory based on current usage rates and historical trauma patterns.</p>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={predictiveData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorStock" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                <RechartsTooltip 
-                  contentStyle={{ backgroundColor: '#111827', borderRadius: '12px', border: '1px solid #1f2937', color: '#fff' }}
-                  itemStyle={{ fontSize: '14px' }}
-                />
-                <Area type="monotone" dataKey="stock" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorStock)" name="Predicted Stock" />
-                <Area type="monotone" dataKey="predicted_demand" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorDemand)" name="Predicted Demand" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Blood Group Health Matrix */}
-      <Card className="rounded-2xl border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            Blood Group Health Matrix
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {bloodUnits.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              {analytics.map((a) => (
-                <div key={a.bloodGroup} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-red-100 dark:bg-red-950 rounded-lg flex items-center justify-center">
-                        <Droplets className="w-4 h-4 text-red-600" />
-                      </div>
-                      <span className="font-bold text-gray-900 dark:text-white font-mono">{a.bloodGroup}</span>
-                    </div>
-                    <Badge className={`rounded-lg text-xs ${a.total === 0 ? "bg-gray-100 text-gray-500" : a.health >= 60 ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400" : a.health >= 30 ? "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400" : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400"}`}>
-                      {a.total === 0 ? "Empty" : a.health >= 60 ? "Good" : a.health >= 30 ? "Low" : "Critical"}
-                    </Badge>
-                  </div>
-
-                  {/* Health bar */}
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Health</span><span>{a.health}%</span>
-                    </div>
-                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${healthColor(a.health)}`} style={{ width: `${a.health}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="text-center p-2 bg-white dark:bg-gray-900 rounded-lg">
-                      <p className="font-bold text-gray-900 dark:text-white">{a.total}</p>
-                      <p className="text-gray-500">Total</p>
-                    </div>
-                    <div className="text-center p-2 bg-white dark:bg-gray-900 rounded-lg">
-                      <p className="font-bold text-emerald-600">{a.available}</p>
-                      <p className="text-gray-500">Available</p>
-                    </div>
-                    <div className="text-center p-2 bg-white dark:bg-gray-900 rounded-lg">
-                      <p className="font-bold text-amber-600">{a.expiringSoon}</p>
-                      <p className="text-gray-500">Expiring</p>
-                    </div>
-                    <div className="text-center p-2 bg-white dark:bg-gray-900 rounded-lg">
-                      <p className="font-bold text-gray-700 dark:text-gray-300">{(a.totalQty / 1000).toFixed(1)}L</p>
-                      <p className="text-gray-500">Volume</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">No blood data available.</p>
-              <p className="text-sm text-gray-400 mt-1">Add blood units from the Blood Bank page.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <div className="space-y-6">
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Blood bank operations</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Inventory overview</h1><p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Counts reflect this bank’s reported inventory. Review physical stock and follow your approved handling procedures.</p></div><Button variant="outline" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</Button></header>
+    {loading ? <p className="py-10 text-center text-sm text-gray-500">Loading inventory summary…</p> : report ? <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
+        { title: 'Available units', value: totals.availableUnits, icon: Droplets, detail: 'Reported available and not expired' },
+        { title: 'Reserved units', value: totals.reservedUnits, icon: Clock3, detail: 'Reserved for an active request' },
+        { title: 'Expiring in 7 days', value: totals.expiringSoonUnits, icon: AlertTriangle, detail: 'Review dated stock records' },
+        { title: 'Stale records', value: totals.staleUnits, icon: RefreshCw, detail: 'Available records not updated in 24 hours' },
+      ].map((metric) => <Card key={metric.title} className="rounded-2xl"><CardContent className="p-5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><metric.icon size={18} /></span><p className="mt-4 text-sm text-gray-500">{metric.title}</p><p className="mt-1 text-2xl font-semibold">{metric.value ?? 0}</p><p className="mt-1 text-xs text-gray-500">{metric.detail}</p></CardContent></Card>)}</div>
+      <Card className="overflow-hidden rounded-2xl"><CardContent className="p-0"><div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800"><h2 className="font-semibold">Reported stock by group and component</h2><p className="mt-1 text-sm text-gray-500">Each quantity reflects unit counts entered by your team, grouped by component.</p></div>
+        {report.breakdown?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900"><tr><th className="px-5 py-3">Group</th><th className="px-5 py-3">Component</th><th className="px-5 py-3">Available</th><th className="px-5 py-3">Reserved</th><th className="px-5 py-3">Expiring soon</th><th className="px-5 py-3">Last updated</th></tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{report.breakdown.map((row) => <tr key={`${row._id.bloodGroup}-${row._id.component}`}><td className="px-5 py-4 font-semibold">{row._id.bloodGroup}</td><td className="px-5 py-4">{label(row._id.component)}</td><td className="px-5 py-4">{row.availableUnits}</td><td className="px-5 py-4">{row.reservedUnits}</td><td className="px-5 py-4">{row.expiringSoonUnits}</td><td className="px-5 py-4 text-gray-500">{row.lastUpdated ? new Date(row.lastUpdated).toLocaleString() : '—'}</td></tr>)}</tbody></table></div> : <div className="p-10 text-center text-sm text-gray-500">No stock records have been added yet.</div>}
+      </CardContent></Card>
+      <p className="flex items-start gap-2 text-xs leading-5 text-gray-500"><Thermometer size={15} className="mt-0.5 shrink-0" />Temperature is shown as entered on each inventory record. LifeNet does not determine whether storage conditions meet your service’s approved standard operating procedure.</p>
+      <p className="text-xs text-gray-500">Report generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : 'just now'}.</p>
+    </> : <Card className="rounded-2xl"><CardContent className="p-8 text-center text-sm text-gray-500">The current summary could not be loaded. Refresh to try again.</CardContent></Card>}
+  </div>;
 }

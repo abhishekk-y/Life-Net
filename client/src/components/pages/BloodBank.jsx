@@ -12,6 +12,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const BLOOD_COMPONENTS = ["WHOLE_BLOOD", "PACKED_RBC", "PLATELETS", "PLASMA", "CRYOPRECIPITATE"];
 
 export function BloodBank() {
   const { user } = useAuth();
@@ -19,24 +20,28 @@ export function BloodBank() {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(null);
   const [selectedBlood, setSelectedBlood] = useState(null);
   const [newUnit, setNewUnit] = useState({
-    bloodGroup: "O+",
-    quantity: 450,
-    collectedAt: new Date().toISOString().split("T")[0],
+    bloodGroup: "",
+    component: "",
+    quantity: "",
+    units: "",
+    collectedAt: "",
     expiryDate: "",
-    storageTemp: 4,
+    storageTemp: "",
     notes: "",
   });
 
   const fetchBloodUnits = async () => {
     try {
-      setLoading(true);
-      const data = await api.blood.list();
+
+      const data = await api.blood.list('limit=100');
       const items = data?.bloodUnits || data || [];
       setBloodUnits(Array.isArray(items) ? items : []);
     } catch (error) {
       console.error("Failed to fetch blood units:", error);
+      toast.error(error.message || "Could not load blood inventory.");
     } finally {
       setLoading(false);
     }
@@ -50,16 +55,16 @@ export function BloodBank() {
     e.preventDefault();
     try {
       setAddLoading(true);
-      const payload = { ...newUnit };
-      if (!payload.expiryDate) {
-        const d = new Date(payload.collectedAt || Date.now());
-        d.setDate(d.getDate() + 42);
-        payload.expiryDate = d.toISOString().split("T")[0];
-      }
+      const payload = {
+        ...newUnit,
+        quantity: Number(newUnit.quantity),
+        units: Number(newUnit.units),
+        storageTemp: Number(newUnit.storageTemp),
+      };
       await api.blood.create(payload);
-      toast.success("Blood unit added successfully!");
+      toast.success("Blood inventory saved.");
       setShowAddDialog(false);
-      setNewUnit({ bloodGroup: "O+", quantity: 450, collectedAt: new Date().toISOString().split("T")[0], expiryDate: "", storageTemp: 4, notes: "" });
+      setNewUnit({ bloodGroup: "", component: "", quantity: "", units: "", collectedAt: "", expiryDate: "", storageTemp: "", notes: "" });
       fetchBloodUnits();
     } catch (error) {
       toast.error(error.message || "Failed to add blood unit");
@@ -68,28 +73,46 @@ export function BloodBank() {
     }
   };
 
+  const handleStatusUpdate = async (unit, status) => {
+    try {
+      setStatusLoading(unit._id);
+      await api.blood.update(unit._id, { status });
+      toast.success(status === "EXPIRED" ? "Record marked expired." : "Stock marked discarded.");
+      await fetchBloodUnits();
+    } catch (error) {
+      toast.error(error.message || "Could not update this stock record.");
+    } finally {
+      setStatusLoading(null);
+    }
+  };
+
+  const isPastExpiry = (date) => {
+    if (!date) return false;
+    const expiry = new Date(date);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return Number.isFinite(expiry.getTime()) && expiry < today;
+  };
+
+  const getEffectiveStatus = (unit) => unit.status === "AVAILABLE" && isPastExpiry(unit.expiryDate) ? "EXPIRED" : unit.status;
+
   // Group by blood type for summary cards
   const bloodSummary = BLOOD_GROUPS.map((bg) => {
     const units = bloodUnits.filter((u) => u.bloodGroup === bg);
-    const available = units.filter((u) => u.status === "AVAILABLE").length;
-    const totalQty = units.reduce((sum, u) => sum + (u.quantity || 0), 0);
+    const total = units.reduce((sum, u) => sum + (u.units || 1), 0);
+    const available = units.filter((u) => u.status === "AVAILABLE" && new Date(u.expiryDate) >= new Date(new Date().setUTCHours(0, 0, 0, 0))).reduce((sum, u) => sum + (u.units || 1), 0);
+    const totalQty = units.reduce((sum, u) => sum + (u.quantity || 0) * (u.units || 1), 0);
     const expiringSoon = units.filter((u) => {
       if (!u.expiryDate) return false;
       const daysLeft = (new Date(u.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
       return daysLeft > 0 && daysLeft < 7;
-    }).length;
-    const status = units.length === 0 ? "Empty" : units.length < 3 ? "Critical" : units.length < 6 ? "Low" : units.length < 10 ? "Medium" : "Good";
-    return { bloodGroup: bg, total: units.length, available, totalQty, expiringSoon, status, units };
+    }).reduce((sum, u) => sum + (u.units || 1), 0);
+    return { bloodGroup: bg, total, available, totalQty, expiringSoon, units };
   });
 
-  const statusColor = (s) => {
-    switch (s) {
-      case "Critical": case "Empty": return "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400";
-      case "Low": return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400";
-      case "Medium": return "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400";
-      default: return "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400";
-    }
-  };
+  const totalAvailableUnits = bloodSummary.reduce((sum, item) => sum + item.available, 0);
+
+  const isPatient = user?.role === 'PATIENT';
 
   const unitStatusColor = (s) => {
     switch (s) {
@@ -97,6 +120,7 @@ export function BloodBank() {
       case "RESERVED": return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400";
       case "USED": return "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400";
       case "EXPIRED": return "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400";
+      case "DISCARDED": return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
       default: return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
     }
   };
@@ -114,9 +138,9 @@ export function BloodBank() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Blood Bank</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{isPatient ? 'Reported blood availability' : 'Blood inventory'}</h1>
           <p className="text-gray-500 dark:text-gray-400">
-            {bloodUnits.length} total units • {bloodUnits.filter(u => u.status === "AVAILABLE").length} available
+            {bloodUnits.reduce((sum, unit) => sum + (unit.units || 1), 0)} reported units • {bloodUnits.filter((unit) => getEffectiveStatus(unit) === 'AVAILABLE').reduce((sum, unit) => sum + (unit.units || 1), 0)} currently available
           </p>
         </div>
         <div className="flex gap-3">
@@ -147,12 +171,12 @@ export function BloodBank() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">{item.bloodGroup}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{item.total} units</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{item.total} reported units</p>
                   </div>
                 </div>
-                <Badge className={`rounded-lg ${statusColor(item.status)}`}>{item.status}</Badge>
+                <Badge className={`rounded-lg ${item.available ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>{item.available ? `${item.available} available` : 'No available stock'}</Badge>
               </div>
-              <Progress value={Math.min((item.total / 15) * 100, 100)} className="h-2 mb-3" />
+              <Progress value={totalAvailableUnits ? Math.min((item.available / totalAvailableUnits) * 100, 100) : 0} className="h-2 mb-3" />
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>{item.available} available</span>
                 {item.expiringSoon > 0 && (
@@ -171,7 +195,7 @@ export function BloodBank() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
             <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            Blood Units Inventory ({bloodUnits.length})
+            Reported stock records ({bloodUnits.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -186,10 +210,11 @@ export function BloodBank() {
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Expires</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Temp</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                    {(user?.role === "ADMIN" || user?.role === "BLOOD_BANK") && <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {bloodUnits.slice(0, 20).map((unit) => {
+                  {bloodUnits.map((unit) => {
                     const daysLeft = unit.expiryDate ? Math.round((new Date(unit.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
                     return (
                       <tr key={unit._id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -198,7 +223,7 @@ export function BloodBank() {
                             <Droplets className="w-3 h-3" /> {unit.bloodGroup}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-sm font-medium text-gray-900 dark:text-white">{unit.quantity} ml</td>
+                        <td className="py-4 px-4 text-sm font-medium text-gray-900 dark:text-white">{unit.quantity} ml × {unit.units || 1} unit(s)</td>
                         <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
                           {unit.collectedAt ? new Date(unit.collectedAt).toLocaleDateString() : "N/A"}
                         </td>
@@ -208,10 +233,20 @@ export function BloodBank() {
                             {daysLeft !== null && daysLeft < 7 && daysLeft > 0 && ` (${daysLeft}d)`}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">{unit.storageTemp ?? 4}°C</td>
+                        <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">{unit.storageTemp == null ? "—" : `${unit.storageTemp}°C`}</td>
                         <td className="py-4 px-4">
-                          <Badge className={`rounded-lg ${unitStatusColor(unit.status)}`}>{unit.status}</Badge>
+                          <Badge className={`rounded-lg ${unitStatusColor(getEffectiveStatus(unit))}`}>{getEffectiveStatus(unit)}</Badge>
                         </td>
+                        {(user?.role === "ADMIN" || user?.role === "BLOOD_BANK") && (
+                          <td className="py-4 px-4 text-right">
+                            {unit.status === "AVAILABLE" && (
+                              <Button variant="outline" size="sm" disabled={statusLoading === unit._id} onClick={() => handleStatusUpdate(unit, isPastExpiry(unit.expiryDate) ? "EXPIRED" : "DISCARDED")}>
+                                {statusLoading === unit._id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isPastExpiry(unit.expiryDate) ? "Confirm expired" : "Discard stock"}
+                              </Button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -221,12 +256,14 @@ export function BloodBank() {
           ) : (
             <div className="text-center py-12">
               <Droplets className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">No blood units in inventory.</p>
-              <p className="text-sm text-gray-400 mt-1">Add blood units to get started.</p>
+              <p className="text-gray-500 dark:text-gray-400">No blood records are reported.</p>
+              {!isPatient && <p className="text-sm text-gray-400 mt-1">Add stock records to begin tracking inventory.</p>}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {isPatient && <p className="text-xs leading-5 text-gray-500">Availability is reported by participating blood banks and may change. This directory does not accept clinical blood requests or verify suitability. Contact your treating hospital for clinical assessment and coordination.</p>}
 
       {/* Add Blood Unit Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -238,28 +275,45 @@ export function BloodBank() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Blood Group</Label>
-                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm" value={newUnit.bloodGroup} onChange={(e) => setNewUnit({ ...newUnit, bloodGroup: e.target.value })}>
+                <select required className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm" value={newUnit.bloodGroup} onChange={(e) => setNewUnit({ ...newUnit, bloodGroup: e.target.value })}>
+                  <option value="" disabled>Select blood group</option>
                   {BLOOD_GROUPS.map((bg) => (<option key={bg} value={bg}>{bg}</option>))}
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Quantity (ml)</Label>
-                <Input type="number" min="100" max="1000" className="rounded-xl" value={newUnit.quantity} onChange={(e) => setNewUnit({ ...newUnit, quantity: parseInt(e.target.value) || 0 })} required />
+                <Label>Component</Label>
+                <select required className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm" value={newUnit.component} onChange={(e) => setNewUnit({ ...newUnit, component: e.target.value })}>
+                  <option value="" disabled>Select component</option>
+                  {BLOOD_COMPONENTS.map((component) => <option key={component} value={component}>{component.replace(/_/g, " ")}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Number of units</Label>
+                <Input type="number" min="1" max="500" step="1" className="rounded-xl" value={newUnit.units} onChange={(e) => setNewUnit({ ...newUnit, units: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Volume per unit (ml)</Label>
+                <Input type="number" min="1" step="any" className="rounded-xl" value={newUnit.quantity} onChange={(e) => setNewUnit({ ...newUnit, quantity: e.target.value })} required />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Collection Date</Label>
-                <Input type="date" className="rounded-xl" value={newUnit.collectedAt} onChange={(e) => setNewUnit({ ...newUnit, collectedAt: e.target.value })} />
+                <Label>Collection date</Label>
+                <Input type="date" max={new Date().toISOString().slice(0, 10)} className="rounded-xl" value={newUnit.collectedAt} onChange={(e) => setNewUnit({ ...newUnit, collectedAt: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Storage Temp (°C)</Label>
-                <Input type="number" min="-20" max="10" className="rounded-xl" value={newUnit.storageTemp} onChange={(e) => setNewUnit({ ...newUnit, storageTemp: parseFloat(e.target.value) || 4 })} />
+                <Input type="number" step="0.1" className="rounded-xl" value={newUnit.storageTemp} onChange={(e) => setNewUnit({ ...newUnit, storageTemp: e.target.value })} required />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
-              <Input className="rounded-xl" placeholder="Optional notes..." value={newUnit.notes} onChange={(e) => setNewUnit({ ...newUnit, notes: e.target.value })} />
+              <Label>Expiry date</Label>
+              <Input type="date" min={newUnit.collectedAt || undefined} className="rounded-xl" value={newUnit.expiryDate} onChange={(e) => setNewUnit({ ...newUnit, expiryDate: e.target.value })} required />
+              <p className="text-xs text-gray-500 dark:text-gray-400">Record the dates and storage temperature shown by your center. LifeNet does not estimate these values.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Operational notes</Label>
+              <Input maxLength={500} className="rounded-xl" placeholder="Storage or handling note (no donor or patient names)" value={newUnit.notes} onChange={(e) => setNewUnit({ ...newUnit, notes: e.target.value })} />
             </div>
             <div className="flex gap-3 pt-4">
               <Button type="submit" disabled={addLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl">
@@ -285,7 +339,7 @@ export function BloodBank() {
             <div className="space-y-4 pt-4">
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 bg-red-50 dark:bg-red-950 rounded-xl text-center">
-                  <p className="text-xs text-red-600 dark:text-red-400 mb-1">Total</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mb-1">Reported units</p>
                   <p className="text-2xl font-bold text-red-700 dark:text-red-300">{selectedBlood.total}</p>
                 </div>
                 <div className="p-4 bg-emerald-50 dark:bg-emerald-950 rounded-xl text-center">

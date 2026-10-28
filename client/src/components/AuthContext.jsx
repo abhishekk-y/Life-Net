@@ -1,73 +1,108 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
+import { createContext, useContext, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { api } from '../lib/api';
+import { connectSocket, disconnectSocket } from '../socket';
 
 const AuthContext = createContext(undefined);
-
-const API_BASE = "/api";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      // Verify token by fetching current user
-      axios
-        .get(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((res) => {
-          setUser(res.data.data);
-        })
-        .catch(() => {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+    let active = true;
+
+    const restoreSession = async () => {
+      try {
+        if (!localStorage.getItem('accessToken')) {
+          const refreshed = await api.auth.refresh();
+          if (refreshed?.accessToken) localStorage.setItem('accessToken', refreshed.accessToken);
+        }
+        if (localStorage.getItem('accessToken')) {
+          const currentUser = await api.auth.me();
+          if (active) setUser(currentUser);
+        }
+      } catch {
+        localStorage.removeItem('accessToken');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    const handleUnauthorized = () => {
+      if (active) setUser(null);
+    };
+
+    window.addEventListener('lifenet:unauthorized', handleUnauthorized);
+    restoreSession();
+
+    return () => {
+      active = false;
+      window.removeEventListener('lifenet:unauthorized', handleUnauthorized);
+    };
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      disconnectSocket();
+      return undefined;
+    }
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) return undefined;
+
+    const socket = connectSocket(token);
+    const handleNotification = (notification) => {
+      if (notification?.title) {
+        toast.info(notification.title, { description: notification.message });
+      }
+    };
+    const handleTokenRefreshed = (event) => connectSocket(event.detail);
+
+    socket.on('notification', handleNotification);
+    window.addEventListener('lifenet:token-refreshed', handleTokenRefreshed);
+    return () => {
+      socket.off('notification', handleNotification);
+      window.removeEventListener('lifenet:token-refreshed', handleTokenRefreshed);
+    };
+  }, [user]);
+
   const login = async (email, password) => {
-    const res = await axios.post(`${API_BASE}/auth/login`, { email, password });
-    const { accessToken, refreshToken, user: userData } = res.data.data;
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
-    setUser(userData);
-    return userData;
+    const result = await api.auth.login({ email, password });
+    localStorage.setItem('accessToken', result.accessToken);
+    setUser(result.user);
+    setIsLoading(false);
+    return result.user;
+  };
+
+  const register = (data) => api.auth.register(data);
+
+  const updateProfile = async (data) => {
+    const updatedUser = await api.auth.updateProfile(data);
+    setUser(updatedUser);
+    return updatedUser;
   };
 
   const logout = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axios.post(
-        `${API_BASE}/auth/logout`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    } catch (_) {
-      // ignore errors on logout
+      await api.auth.logout();
+    } catch {
+      // Local sign-out still succeeds when the API is unavailable.
     }
+    localStorage.removeItem('accessToken');
     setUser(null);
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
   };
 
   return (
-    <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, isLoading, login, logout }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, register, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 }

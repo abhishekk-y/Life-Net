@@ -1,16 +1,5 @@
-# React + Vite
+# LifeNet client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React and Vite interface for the LifeNet coordination app. Follow the repository-level [README](../README.md) for managed MongoDB setup, local development, demo accounts, and deployment.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+For local development, install this folder’s locked dependencies and run `npm run dev`. The development server proxies `/api` and `/socket.io` to `http://localhost:5000`. The database connection string belongs only in `server/.env`; never expose it through a `VITE_` variable. Use `client/.env.example` only when pointing the client directly at a separate API origin.

@@ -26,15 +26,6 @@ const organSchema = new mongoose.Schema(
       enum: ORGAN_STATUS,
       default: 'AVAILABLE',
     },
-    donorAge: {
-      type: Number,
-      min: 0,
-      max: 120,
-    },
-    donorGender: {
-      type: String,
-      enum: ['MALE', 'FEMALE', 'OTHER'],
-    },
     // Harvested timestamp for viability tracking
     harvestedAt: {
       type: Date,

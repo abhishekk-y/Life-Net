@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { randomUUID } = require('crypto');
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const BLOOD_COMPONENTS = ['WHOLE_BLOOD', 'PACKED_RBC', 'PLATELETS', 'PLASMA', 'CRYOPRECIPITATE'];
@@ -49,6 +50,7 @@ const bloodUnitSchema = new mongoose.Schema(
     donorId: {
       type: String,
       required: true,
+      default: () => `BATCH-${randomUUID()}`,
     },
     // Source blood bank
     bloodBank: {
@@ -78,33 +80,15 @@ bloodUnitSchema.index({ bloodBank: 1 });
 
 // Virtual: check if expired
 bloodUnitSchema.virtual('isExpired').get(function () {
-  return new Date() > this.expiryDate;
+  const utcToday = new Date();
+  utcToday.setUTCHours(0, 0, 0, 0);
+  return utcToday > this.expiryDate;
 });
 
 // Virtual: days until expiry
 bloodUnitSchema.virtual('daysUntilExpiry').get(function () {
   const diff = this.expiryDate - new Date();
   return Math.max(0, Math.ceil(diff / 86400000));
-});
-
-// Virtual: temperature status
-bloodUnitSchema.virtual('tempStatus').get(function () {
-  // Whole blood/RBC: 2-6°C, Platelets: 20-24°C, Plasma: -18°C or below
-  if (['WHOLE_BLOOD', 'PACKED_RBC'].includes(this.component)) {
-    if (this.storageTemp >= 2 && this.storageTemp <= 6) return 'OPTIMAL';
-    if (this.storageTemp >= 1 && this.storageTemp <= 8) return 'WARNING';
-    return 'CRITICAL';
-  }
-  if (this.component === 'PLATELETS') {
-    if (this.storageTemp >= 20 && this.storageTemp <= 24) return 'OPTIMAL';
-    return 'CRITICAL';
-  }
-  if (['PLASMA', 'CRYOPRECIPITATE'].includes(this.component)) {
-    if (this.storageTemp <= -18) return 'OPTIMAL';
-    if (this.storageTemp <= -10) return 'WARNING';
-    return 'CRITICAL';
-  }
-  return 'UNKNOWN';
 });
 
 bloodUnitSchema.set('toJSON', { virtuals: true });

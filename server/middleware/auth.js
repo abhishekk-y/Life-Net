@@ -31,6 +31,13 @@ const protect = asyncHandler(async (req, res, next) => {
   if (!user.isActive) {
     throw ApiError.forbidden('Account has been deactivated');
   }
+  if (user.role !== decoded.role) {
+    throw ApiError.unauthorized('Account access changed. Sign in again.');
+  }
+
+  if (user.role !== 'ADMIN' && user.verificationStatus && user.verificationStatus !== 'APPROVED') {
+    throw ApiError.forbidden('Your account must be approved before using this LifeNet service.');
+  }
 
   req.user = user;
   next();

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const ROLES = ['ADMIN', 'HOSPITAL', 'BLOOD_BANK', 'PROCUREMENT_CENTER'];
+const ROLES = ['ADMIN', 'PATIENT', 'DOCTOR', 'HOSPITAL', 'PHARMACY', 'SUPPLIER', 'BLOOD_BANK', 'PROCUREMENT_CENTER'];
+const VERIFICATION_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'];
 
 const userSchema = new mongoose.Schema(
   {
@@ -19,6 +20,9 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
+    emailVerified: { type: Boolean, default: true },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
     password: {
       type: String,
       required: [true, 'Password is required'],
@@ -30,9 +34,19 @@ const userSchema = new mongoose.Schema(
       enum: ROLES,
       default: 'HOSPITAL',
     },
+    verificationStatus: {
+      type: String,
+      enum: VERIFICATION_STATUSES,
+      default: 'APPROVED',
+    },
     organization: {
       type: String,
       trim: true,
+    },
+    providerDetails: {
+      specialty: { type: String, trim: true, maxlength: 120 },
+      qualification: { type: String, trim: true, maxlength: 160 },
+      registrationNumber: { type: String, trim: true, maxlength: 100 },
     },
     phone: {
       type: String,
@@ -57,6 +71,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, select: false },
     lastLogin: Date,
     avatar: String,
   },
@@ -89,9 +105,14 @@ userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshToken;
+  delete obj.passwordResetTokenHash;
+  delete obj.passwordResetExpiresAt;
+  delete obj.emailVerificationTokenHash;
+  delete obj.emailVerificationExpiresAt;
   delete obj.__v;
   return obj;
 };
 
 module.exports = mongoose.model('User', userSchema);
 module.exports.ROLES = ROLES;
+module.exports.VERIFICATION_STATUSES = VERIFICATION_STATUSES;

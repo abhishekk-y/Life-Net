@@ -23,6 +23,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
+import { RoleDashboard } from "./RoleDashboard";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -43,6 +44,12 @@ const urgencyColors = {
 
 export function Dashboard() {
   const { user } = useAuth();
+  if (!['ADMIN', 'HOSPITAL'].includes(user?.role)) return <RoleDashboard />;
+  return <NetworkDashboard />;
+}
+
+function NetworkDashboard() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [organs, setOrgans] = useState([]);
@@ -50,11 +57,10 @@ export function Dashboard() {
   const [requests, setRequests] = useState([]);
   const [activity, setActivity] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [selectedBlood, setSelectedBlood] = useState(null);
   const [selectedOrgan, setSelectedOrgan] = useState(null);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
+
     try {
       const [statsData, organsData, bloodData, requestsData, activityData] =
         await Promise.allSettled([
@@ -96,20 +102,21 @@ export function Dashboard() {
   // Compute blood inventory summary from real data
   const bloodSummary = BLOOD_GROUPS.map((bg) => {
     const units = bloodUnits.filter((u) => u.bloodGroup === bg);
-    const totalQty = units.reduce((sum, u) => sum + (u.quantity || 0), 0);
-    const available = units.filter((u) => u.status === "AVAILABLE").length;
+    const totalQty = units.reduce((sum, u) => sum + (u.quantity || 0) * (u.units || 1), 0);
+    const available = units.filter((u) => u.status === "AVAILABLE" && new Date(u.expiryDate) > new Date()).reduce((sum, u) => sum + (u.units || 1), 0);
     const expiringSoon = units.filter((u) => {
       const exp = new Date(u.expiryDate);
       const daysLeft = (exp - new Date()) / (1000 * 60 * 60 * 24);
       return daysLeft < 7 && daysLeft > 0;
-    }).length;
+    }).reduce((sum, u) => sum + (u.units || 1), 0);
+    const totalUnits = units.reduce((sum, u) => sum + (u.units || 1), 0);
     return {
       bloodGroup: bg,
-      totalUnits: units.length,
+      totalUnits,
       totalQty,
       available,
       expiringSoon,
-      percentage: Math.min(Math.round((units.length / 10) * 100), 100),
+      percentage: units.reduce((sum, u) => sum + (u.status === "AVAILABLE" && new Date(u.expiryDate) > new Date() ? (u.units || 1) : 0), 0),
     };
   }).filter((b) => b.totalUnits > 0);
 
@@ -121,7 +128,7 @@ export function Dashboard() {
       organSummary[type] = { name: type, available: 0, total: 0, items: [] };
     }
     organSummary[type].total++;
-    if (o.status === "AVAILABLE") organSummary[type].available++;
+    if (o.status === "AVAILABLE" && o.isViable) organSummary[type].available++;
     organSummary[type].items.push(o);
   });
   const organList = Object.values(organSummary);
@@ -129,31 +136,31 @@ export function Dashboard() {
   const kpiCards = [
     {
       title: "Total Organs",
-      value: stats?.totalOrgans ?? organs.length,
-      sub: `${stats?.availableOrgans ?? organList.reduce((s, o) => s + o.available, 0)} available`,
+      value: stats?.organs?.total ?? organs.length,
+      sub: `${stats?.organs?.available ?? organList.reduce((s, o) => s + o.available, 0)} available`,
       icon: Heart,
       color: "text-rose-600 dark:text-rose-400",
       bgColor: "bg-rose-50 dark:bg-rose-950",
     },
     {
       title: "Blood Units",
-      value: stats?.totalBloodUnits ?? bloodUnits.length,
-      sub: `${stats?.availableBloodUnits ?? bloodSummary.reduce((s, b) => s + b.available, 0)} available`,
+      value: stats?.blood?.total ?? bloodUnits.reduce((sum, item) => sum + (item.units || 1), 0),
+      sub: `${stats?.blood?.available ?? bloodSummary.reduce((s, b) => s + b.available, 0)} available`,
       icon: Droplets,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-950",
     },
     {
       title: "Active Requests",
-      value: stats?.pendingRequests ?? requests.filter((r) => r.status !== "COMPLETED" && r.status !== "REJECTED").length,
-      sub: `${stats?.totalRequests ?? requests.length} total`,
+      value: stats?.requests?.active ?? requests.filter((r) => !["COMPLETED", "REJECTED", "CANCELLED"].includes(r.status)).length,
+      sub: `${stats?.requests?.total ?? requests.length} total`,
       icon: Activity,
       color: "text-amber-600 dark:text-amber-400",
       bgColor: "bg-amber-50 dark:bg-amber-950",
     },
     {
       title: "Users",
-      value: stats?.totalUsers ?? "—",
+      value: stats?.users?.total ?? "—",
       sub: `${user?.role || "Admin"} access`,
       icon: Users,
       color: "text-emerald-600 dark:text-emerald-400",
@@ -246,7 +253,7 @@ export function Dashboard() {
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-gray-900 dark:text-white font-semibold">
-                        {blood.totalUnits} units ({blood.totalQty} ml)
+                        {blood.totalUnits} units ({blood.totalQty} ml recorded)
                       </span>
                       {blood.expiringSoon > 0 && (
                         <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 text-[10px]">
@@ -255,7 +262,7 @@ export function Dashboard() {
                       )}
                     </div>
                   </div>
-                  <Progress value={blood.percentage} className="h-2" />
+                <Progress value={Math.min((blood.available / Math.max(1, bloodSummary.reduce((sum, group) => sum + group.available, 0))) * 100, 100)} className="h-2" />
                 </div>
               ))
             ) : (
@@ -485,11 +492,9 @@ export function Dashboard() {
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Patient</p>
+                  <p className="text-xs text-gray-500 mb-1">Requested quantity</p>
                   <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedRequest.patientAge
-                      ? `Age ${selectedRequest.patientAge}, ${selectedRequest.patientGender || "N/A"}`
-                      : "Not specified"}
+                    {selectedRequest.resourceDetails?.quantity || 1} {selectedRequest.type === "BLOOD" ? "unit(s)" : "request"}
                   </p>
                 </div>
               </div>
@@ -631,7 +636,7 @@ export function Dashboard() {
                     >
                       <div>
                         <p className="text-sm text-gray-900 dark:text-white">
-                          Blood: {item.bloodGroup} • Age: {item.donorAge || "N/A"}
+                          {item.organType?.replace(/_/g, " ")} · {item.bloodGroup}
                         </p>
                         <p className="text-xs text-gray-500">
                           {item.location?.city || "Unknown location"}

@@ -5,7 +5,7 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Label } from "../ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { Search, Eye, X, Calendar, MapPin, User, Activity, Plus, Loader2, Heart, Printer } from "lucide-react";
+import { Search, Eye, X, Calendar, MapPin, Activity, Plus, Loader2, Heart, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../lib/api";
 import { useAuth } from "../AuthContext";
@@ -28,20 +28,19 @@ export function Organs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
   const [newOrgan, setNewOrgan] = useState({
     organType: "KIDNEY",
     bloodGroup: "O+",
-    donorAge: 30,
-    donorGender: "MALE",
-    viabilityHours: 24,
+    harvestedAt: "",
+    viabilityHours: "",
     location: { city: "", state: "" },
     notes: "",
   });
 
   const fetchOrgans = async () => {
     try {
-      setLoading(true);
-      const data = await api.organs.list();
+      const data = await api.organs.list("limit=100");
       const items = data?.organs || data || [];
       setOrgans(Array.isArray(items) ? items : []);
     } catch (error) {
@@ -56,19 +55,41 @@ export function Organs() {
     fetchOrgans();
   }, []);
 
+  const refreshOrgans = () => { setLoading(true); fetchOrgans(); };
+
   const handleAddOrgan = async (e) => {
     e.preventDefault();
     try {
       setAddLoading(true);
-      await api.organs.create(newOrgan);
-      toast.success("Organ registered successfully!");
+      const payload = {
+        ...newOrgan,
+        harvestedAt: new Date(newOrgan.harvestedAt).toISOString(),
+        viabilityHours: Number(newOrgan.viabilityHours),
+        notes: newOrgan.notes.trim(),
+      };
+      await api.organs.create(payload);
+      toast.success("Organ availability record saved.");
       setShowAddDialog(false);
-      setNewOrgan({ organType: "KIDNEY", bloodGroup: "O+", donorAge: 30, donorGender: "MALE", viabilityHours: 24, location: { city: "", state: "" }, notes: "" });
+      setNewOrgan({ organType: "KIDNEY", bloodGroup: "O+", harvestedAt: "", viabilityHours: "", location: { city: "", state: "" }, notes: "" });
       fetchOrgans();
     } catch (error) {
       toast.error(error.message || "Failed to add organ");
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleExpireOrgan = async (organ) => {
+    try {
+      setStatusLoading(true);
+      const updated = await api.organs.update(organ._id, { status: "EXPIRED" });
+      setSelectedOrgan((current) => current?._id === organ._id ? { ...current, ...updated } : current);
+      toast.success("Organ record marked expired.");
+      await fetchOrgans();
+    } catch (error) {
+      toast.error(error.message || "Could not update the organ record.");
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -80,14 +101,18 @@ export function Organs() {
   );
 
   const getViabilityRemaining = (organ) => {
-    if (!organ.harvestedAt || !organ.viabilityHours) return "N/A";
-    const harvested = new Date(organ.harvestedAt);
-    const expires = new Date(harvested.getTime() + organ.viabilityHours * 60 * 60 * 1000);
-    const now = new Date();
-    const hoursLeft = Math.max(0, (expires - now) / (1000 * 60 * 60));
+    if (organ.hoursRemaining == null) return "N/A";
+    const hoursLeft = Math.max(0, Number(organ.hoursRemaining));
     if (hoursLeft <= 0) return "Expired";
     if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)} min`;
     return `${Math.round(hoursLeft)}h remaining`;
+  };
+
+  const getViabilityPercent = (organ) => {
+    const total = Number(organ.viabilityHours);
+    const remaining = Number(organ.hoursRemaining);
+    if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(remaining)) return 0;
+    return Math.max(0, Math.min(100, (remaining / total) * 100));
   };
 
   if (loading) {
@@ -101,7 +126,7 @@ export function Organs() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Organs Registry
@@ -110,6 +135,8 @@ export function Organs() {
             {organs.length} organs registered • {organs.filter(o => o.status === "AVAILABLE").length} available
           </p>
         </div>
+        <div className="flex gap-2">
+        <Button variant="outline" onClick={refreshOrgans} className="rounded-xl"><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
         {(user?.role === "ADMIN" || user?.role === "PROCUREMENT_CENTER") && (
           <Button
             className="bg-blue-600 hover:bg-blue-700 rounded-xl"
@@ -119,6 +146,7 @@ export function Organs() {
             Register Organ
           </Button>
         )}
+        </div>
       </div>
 
       {/* Search */}
@@ -142,7 +170,7 @@ export function Organs() {
                   <tr className="border-b border-gray-200 dark:border-gray-800">
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Blood Group</th>
-                    <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Donor Age</th>
+                    <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Harvested</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Viability</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Location</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
@@ -169,10 +197,10 @@ export function Organs() {
                         </Badge>
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-700 dark:text-gray-300">
-                        {organ.donorAge || "N/A"} yrs
+                        {organ.harvestedAt ? new Date(organ.harvestedAt).toLocaleString() : "Not recorded"}
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-700 dark:text-gray-300">
-                        {organ.viabilityHours}h window • {getViabilityRemaining(organ)}
+                        {organ.viabilityHours}h reported window • {getViabilityRemaining(organ)}
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-700 dark:text-gray-300">
                         {organ.location?.city || "Unknown"}
@@ -244,24 +272,17 @@ export function Organs() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Donor Age</Label>
-                <Input type="number" min="0" max="120" className="rounded-xl" value={newOrgan.donorAge} onChange={(e) => setNewOrgan({ ...newOrgan, donorAge: parseInt(e.target.value) || 0 })} />
+                <Label htmlFor="harvestedAt">Harvest time recorded by the center</Label>
+                <Input id="harvestedAt" type="datetime-local" className="rounded-xl" value={newOrgan.harvestedAt} onChange={(e) => setNewOrgan({ ...newOrgan, harvestedAt: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>Gender</Label>
-                <select className="w-full h-10 px-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm" value={newOrgan.donorGender} onChange={(e) => setNewOrgan({ ...newOrgan, donorGender: e.target.value })}>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Viability (hrs)</Label>
-                <Input type="number" min="1" className="rounded-xl" value={newOrgan.viabilityHours} onChange={(e) => setNewOrgan({ ...newOrgan, viabilityHours: parseInt(e.target.value) || 1 })} />
+                <Label htmlFor="viabilityHours">Reported viability window (hours)</Label>
+                <Input id="viabilityHours" type="number" min="1" step="0.1" className="rounded-xl" value={newOrgan.viabilityHours} onChange={(e) => setNewOrgan({ ...newOrgan, viabilityHours: e.target.value })} required />
               </div>
             </div>
+            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">Enter values from the authorized center’s current record. LifeNet does not assess clinical suitability or determine organ allocation.</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>City</Label>
@@ -273,8 +294,8 @@ export function Organs() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
-              <Input className="rounded-xl" placeholder="Any additional details..." value={newOrgan.notes} onChange={(e) => setNewOrgan({ ...newOrgan, notes: e.target.value })} />
+              <Label>Operational notes (optional)</Label>
+              <Input maxLength={500} className="rounded-xl" placeholder="Logistics only; do not include personal or clinical details" value={newOrgan.notes} onChange={(e) => setNewOrgan({ ...newOrgan, notes: e.target.value })} />
             </div>
             <div className="flex gap-3 pt-4">
               <Button type="submit" disabled={addLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl">
@@ -291,17 +312,17 @@ export function Organs() {
 
       {/* Organ Detail Dialog */}
       <Dialog open={!!selectedOrgan} onOpenChange={() => setSelectedOrgan(null)}>
-        <DialogContent className="sm:max-w-[700px] bg-black border-gray-800 rounded-2xl text-white shadow-2xl p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-2xl text-gray-900 dark:text-white shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="text-2xl font-bold tracking-tight">
-              Clinical Organ Profile
+              Organ availability record
             </DialogTitle>
           </DialogHeader>
           
           {selectedOrgan && (
             <div className="flex flex-col">
               {/* Header Bar */}
-              <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-800 bg-gray-900/50">
+              <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                 <div className="w-16 h-16 rounded-xl bg-blue-900/40 border border-blue-500/30 flex items-center justify-center">
                   <Heart className="w-8 h-8 text-blue-400" />
                 </div>
@@ -323,7 +344,7 @@ export function Organs() {
               </div>
 
               {/* Data Grid */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-950">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white dark:bg-gray-950">
                 
                 {/* Viability Module */}
                 <div className="space-y-3">
@@ -337,28 +358,28 @@ export function Organs() {
                         {getViabilityRemaining(selectedOrgan)}
                       </span>
                       <span className="text-xs text-gray-500 font-mono">
-                        / {selectedOrgan.viabilityHours}H TOTAL
+                        {selectedOrgan.viabilityHours}h reported window
                       </span>
                     </div>
                     <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mt-3">
-                      <div className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: '75%' }}></div>
+                      <div className="h-full bg-emerald-500 transition-[width]" style={{ width: `${getViabilityPercent(selectedOrgan)}%` }}></div>
                     </div>
                   </div>
                 </div>
 
-                {/* Donor Module */}
+                {/* Record status */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
-                    <User className="w-4 h-4 text-blue-400" /> Donor Demographics
+                    <Activity className="w-4 h-4 text-blue-400" /> Record details
                   </div>
-                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-gray-500 font-mono mb-1">AGE</p>
-                      <p className="text-lg font-bold text-gray-200">{selectedOrgan.donorAge || "N/A"} <span className="text-sm font-normal text-gray-500">YRS</span></p>
+                      <p className="text-xs text-gray-500 font-mono mb-1">ORGAN TYPE</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedOrgan.organType?.replace(/_/g, " ")}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 font-mono mb-1">GENDER</p>
-                      <p className="text-lg font-bold text-gray-200">{selectedOrgan.donorGender || "N/A"}</p>
+                      <p className="text-xs text-gray-500 font-mono mb-1">BLOOD GROUP</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedOrgan.bloodGroup}</p>
                     </div>
                   </div>
                 </div>
@@ -368,18 +389,18 @@ export function Organs() {
                   <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
                     <MapPin className="w-4 h-4 text-purple-400" /> Procurement Logistics
                   </div>
-                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 space-y-3">
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 space-y-3">
                     <div>
-                      <p className="text-xs text-gray-500 font-mono mb-1">ORIGIN CACHE</p>
+                      <p className="text-xs text-gray-500 font-mono mb-1">LOCATION</p>
                       <p className="text-sm font-medium text-gray-200">
                         {selectedOrgan.location?.city || "Unknown"}
                         {selectedOrgan.location?.state ? `, ${selectedOrgan.location.state}` : ""}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 font-mono mb-1">HARVEST TIMESTAMP</p>
+                      <p className="text-xs text-gray-500 font-mono mb-1">HARVEST TIME RECORDED</p>
                       <p className="text-sm font-medium text-gray-300 font-mono">
-                        {new Date(selectedOrgan.createdAt).toLocaleString('en-IN', { hour12: false })}
+                        {selectedOrgan.harvestedAt ? new Date(selectedOrgan.harvestedAt).toLocaleString('en-IN', { hour12: false }) : "Not recorded"}
                       </p>
                     </div>
                   </div>
@@ -388,15 +409,15 @@ export function Organs() {
                 {/* Clinical Notes */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-gray-400 uppercase tracking-widest font-semibold">
-                    <Search className="w-4 h-4 text-amber-400" /> Clinical Assessment
+                    <Search className="w-4 h-4 text-amber-400" /> Operational notes
                   </div>
-                  <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/50 h-[104px] overflow-y-auto custom-scrollbar">
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 h-[104px] overflow-y-auto custom-scrollbar">
                     {selectedOrgan.notes ? (
-                      <p className="text-sm text-amber-200/80 leading-relaxed font-medium">
-                        " {selectedOrgan.notes} "
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                        {selectedOrgan.notes}
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-600 italic">No additional clinical notes provided.</p>
+                      <p className="text-sm text-gray-500 italic">No operational notes provided.</p>
                     )}
                   </div>
                 </div>
@@ -404,17 +425,17 @@ export function Organs() {
               </div>
 
               {/* Action Bar */}
-              <div className="p-4 border-t border-gray-800 bg-black flex justify-between gap-3">
-                <Button variant="outline" className="border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 gap-2" onClick={() => window.print()}>
+              <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-between gap-3">
+                <Button variant="outline" className="gap-2" onClick={() => window.print()}>
                   <Printer className="w-4 h-4" /> Print Dispatch Report
                 </Button>
                 <div className="flex gap-3">
-                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800" onClick={() => setSelectedOrgan(null)}>
+                  <Button variant="outline" onClick={() => setSelectedOrgan(null)}>
                     Close Profile
                   </Button>
-                  {selectedOrgan.status === 'AVAILABLE' && (
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold no-print">
-                      Initiate Procurement Match
+                  {selectedOrgan.status === 'AVAILABLE' && getViabilityRemaining(selectedOrgan) === "Expired" && (user?.role === "ADMIN" || user?.role === "PROCUREMENT_CENTER") && (
+                    <Button disabled={statusLoading} className="bg-rose-600 hover:bg-rose-700 text-white font-semibold no-print" onClick={() => handleExpireOrgan(selectedOrgan)}>
+                      {statusLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Mark expired
                     </Button>
                   )}
                 </div>
