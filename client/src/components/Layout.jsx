@@ -21,6 +21,7 @@ import {
   Truck,
   Bell,
   Settings,
+  HeartPulse,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "./ThemeProvider";
@@ -29,6 +30,7 @@ import { toast } from "sonner";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/care-services", label: "Care services · demo", icon: HeartPulse },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/settings", label: "Account security", icon: Settings },
   { path: "/analytics", label: "Analytics", icon: BarChart3, roles: ["ADMIN"] },

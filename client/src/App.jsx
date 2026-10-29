@@ -36,6 +36,7 @@ const Analytics = lazyPage(() => import("./components/pages/Analytics"), "Analyt
 const Settings = lazyPage(() => import("./components/pages/Settings"), "Settings");
 const PasswordReset = lazyPage(() => import("./components/pages/PasswordReset"), "PasswordReset");
 const VerifyEmail = lazyPage(() => import("./components/pages/VerifyEmail"), "VerifyEmail");
+const CareServices = lazyPage(() => import("./components/pages/CareServices"), "CareServices");
 
 function RoleGate({ roles, children }) {
   const { user } = useAuth();
@@ -65,6 +66,7 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="care-services" element={<CareServices />} />
               <Route path="analytics" element={<RoleGate roles={["ADMIN"]}><Analytics /></RoleGate>} />
               <Route path="categories" element={<Categories />} />
               <Route path="organs" element={<RoleGate roles={["ADMIN", "HOSPITAL", "PROCUREMENT_CENTER"]}><Organs /></RoleGate>} />
