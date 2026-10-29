@@ -110,7 +110,7 @@ app.use('/api/suppliers', suppliersRoutes);
 
 // In production, serve the built client and API from the same origin. This
 // keeps cookie authentication and Socket.IO on one host without extra CORS setup.
-const clientBuildPath = path.resolve(__dirname, '../client/dist');
+const clientBuildPath = path.join(__dirname, 'public');
 if (config.nodeEnv === 'production' && fs.existsSync(path.join(clientBuildPath, 'index.html'))) {
   app.use(express.static(clientBuildPath, { index: false, maxAge: '1d' }));
   app.get('*', (req, res, next) => {
