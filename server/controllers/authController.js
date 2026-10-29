@@ -15,7 +15,7 @@ const hashEmailToken = (token) => crypto.createHash('sha256').update(token).dige
 const deliverVerificationEmail = async (user, token) => {
   const origin = config.clientOrigins[0] || 'http://localhost:5173';
   const verificationUrl = `${origin}/verify-email?token=${encodeURIComponent(token)}`;
-  if (config.email.host) {
+  if (config.email.isConfigured()) {
     try {
       await sendEmailVerification({ email: user.email, name: user.name, verificationUrl });
     } catch (error) {
@@ -269,7 +269,7 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
     await user.save({ validateBeforeSave: false });
     const origin = config.clientOrigins[0] || 'http://localhost:5173';
     const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
-    if (config.email.host) {
+    if (config.email.isConfigured()) {
       try {
         await sendPasswordReset({ email: user.email, name: user.name, resetUrl });
       } catch (error) {

@@ -40,6 +40,10 @@ const config = {
   },
 };
 
+config.email.isConfigured = () => config.email.provider === 'brevo'
+  ? Boolean(config.email.apiKey && config.email.from)
+  : Boolean(config.email.host && config.email.from);
+
 config.validate = () => {
   if (config.nodeEnv !== 'production') return;
 

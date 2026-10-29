@@ -3,13 +3,28 @@ const config = require('../config');
 
 async function sendMail(message) {
   if (config.email.provider === 'brevo') {
+    const senderMatch = String(config.email.from).match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+    const sender = senderMatch
+      ? { email: senderMatch[2].trim(), ...(senderMatch[1].trim() ? { name: senderMatch[1].trim() } : {}) }
+      : { email: config.email.from.trim() };
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'api-key': config.email.apiKey, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: { email: config.email.from }, to: [{ email: message.to }], subject: message.subject, textContent: message.text, htmlContent: message.html }),
+      body: JSON.stringify({ sender, to: [{ email: message.to }], subject: message.subject, textContent: message.text, htmlContent: message.html }),
     });
-    if (!response.ok) throw new Error(`Brevo email request failed (${response.status})`);
-    return response.json();
+    if (!response.ok) {
+      const responseBody = await response.text();
+      let providerMessage = '';
+      try {
+        const details = JSON.parse(responseBody);
+        providerMessage = details.message || details.code || '';
+      } catch {
+        // Keep provider responses bounded and avoid logging request headers or credentials.
+        providerMessage = responseBody.slice(0, 300);
+      }
+      throw new Error(`Brevo email request failed (${response.status})${providerMessage ? `: ${providerMessage}` : ''}`);
+    }
+    return response.json().catch(() => ({}));
   }
   const transporter = nodemailer.createTransport({ host: config.email.host, port: config.email.port, secure: config.email.secure, ...(config.email.user ? { auth: { user: config.email.user, pass: config.email.password } } : {}) });
   return transporter.sendMail(message);
