@@ -7,73 +7,73 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 164 25% 13%;
+    --foreground: 25 25% 13%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 164 52% 31%;
+    --primary: 24 92% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 156 24% 94%;
-    --secondary-foreground: 164 25% 18%;
-    --muted: 156 18% 95%;
-    --muted-foreground: 160 10% 39%;
-    --accent: 155 30% 92%;
-    --accent-foreground: 164 40% 23%;
+    --secondary: 30 38% 95%;
+    --secondary-foreground: 25 28% 20%;
+    --muted: 30 25% 96%;
+    --muted-foreground: 25 10% 40%;
+    --accent: 28 75% 92%;
+    --accent-foreground: 23 65% 29%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 156 16% 86%;
-    --input: 156 16% 82%;
-    --ring: 164 52% 38%;
+    --border: 28 18% 87%;
+    --input: 28 18% 82%;
+    --ring: 24 90% 48%;
     --radius: 0.75rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --sidebar-background: 153 26% 97%;
-    --sidebar-foreground: 164 22% 23%;
-    --sidebar-primary: 164 52% 31%;
+    --sidebar-background: 30 35% 97%;
+    --sidebar-foreground: 25 22% 24%;
+    --sidebar-primary: 24 92% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 155 30% 92%;
-    --sidebar-accent-foreground: 164 40% 23%;
-    --sidebar-border: 156 16% 89%;
-    --sidebar-ring: 164 52% 38%;
+    --sidebar-accent: 28 75% 92%;
+    --sidebar-accent-foreground: 23 65% 29%;
+    --sidebar-border: 28 18% 89%;
+    --sidebar-ring: 24 90% 48%;
   }
 
   .dark {
-    --background: 165 22% 8%;
+    --background: 25 18% 8%;
     --foreground: 150 20% 94%;
-    --card: 165 20% 11%;
+    --card: 25 16% 11%;
     --card-foreground: 150 20% 94%;
-    --popover: 165 20% 11%;
+    --popover: 25 16% 11%;
     --popover-foreground: 150 20% 94%;
-    --primary: 155 48% 56%;
-    --primary-foreground: 165 30% 9%;
-    --secondary: 165 16% 17%;
+    --primary: 25 92% 60%;
+    --primary-foreground: 25 30% 10%;
+    --secondary: 25 16% 18%;
     --secondary-foreground: 150 18% 90%;
-    --muted: 165 16% 16%;
-    --muted-foreground: 155 10% 67%;
-    --accent: 164 19% 19%;
+    --muted: 25 16% 16%;
+    --muted-foreground: 28 12% 68%;
+    --accent: 25 20% 20%;
     --accent-foreground: 150 20% 93%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 164 14% 24%;
-    --input: 164 14% 28%;
-    --ring: 155 48% 56%;
+    --border: 25 13% 24%;
+    --input: 25 13% 29%;
+    --ring: 25 92% 60%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 165 24% 9%;
-    --sidebar-foreground: 150 15% 89%;
-    --sidebar-primary: 155 48% 56%;
-    --sidebar-primary-foreground: 165 30% 9%;
-    --sidebar-accent: 164 19% 19%;
+    --sidebar-background: 25 20% 9%;
+    --sidebar-foreground: 30 15% 89%;
+    --sidebar-primary: 25 92% 60%;
+    --sidebar-primary-foreground: 25 30% 9%;
+    --sidebar-accent: 25 20% 20%;
     --sidebar-accent-foreground: 150 20% 93%;
-    --sidebar-border: 164 14% 21%;
-    --sidebar-ring: 155 48% 56%;
+    --sidebar-border: 25 13% 22%;
+    --sidebar-ring: 25 92% 60%;
   }
 }
 
@@ -96,7 +96,7 @@
     outline-offset: 3px;
   }
 
-  ::selection { background: #b8ded0; color: #123b33; }
+  ::selection { background: #fed7aa; color: #7c2d12; }
 }
 
 /* ═════════════ Theme Variable Utilities ═════════════ */
@@ -152,8 +152,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 5px rgba(37, 99, 235, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.6); }
+  0%, 100% { box-shadow: 0 0 5px rgba(234, 88, 12, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(234, 88, 12, 0.6); }
 }
 
 @keyframes slide-in-right {
@@ -197,7 +197,7 @@
   z-index: 100;
   transform: translateY(-180%);
   border-radius: 0.75rem;
-  background: #153d3b;
+  background: #9a3412;
   padding: 0.75rem 1rem;
   color: white;
   font-size: 0.875rem;
