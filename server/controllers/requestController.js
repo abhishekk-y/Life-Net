@@ -469,6 +469,7 @@ module.exports = {
   getRequests,
   createRequest,
   matchRequest,
+  assignResource,
   approveRequest,
   transferRequest,
   completeRequest,
