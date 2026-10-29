@@ -29,6 +29,8 @@ const config = {
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean),
   email: {
+    provider: process.env.EMAIL_PROVIDER || 'smtp',
+    apiKey: process.env.BREVO_API_KEY || '',
     host: process.env.SMTP_HOST || '',
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
@@ -50,7 +52,8 @@ config.validate = () => {
   if (config.jwt.accessSecret && config.jwt.accessSecret === config.jwt.refreshSecret) {
     missing.push('different access and refresh secrets');
   }
-  if (!config.email.host) missing.push('SMTP_HOST');
+  if (config.email.provider === 'brevo' && !config.email.apiKey) missing.push('BREVO_API_KEY');
+  if (config.email.provider !== 'brevo' && !config.email.host) missing.push('SMTP_HOST');
   if (!config.email.from) missing.push('SMTP_FROM');
 
   if (missing.length) {

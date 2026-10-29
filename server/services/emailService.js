@@ -1,14 +1,22 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
+async function sendMail(message) {
+  if (config.email.provider === 'brevo') {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': config.email.apiKey, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: { email: config.email.from }, to: [{ email: message.to }], subject: message.subject, textContent: message.text, htmlContent: message.html }),
+    });
+    if (!response.ok) throw new Error(`Brevo email request failed (${response.status})`);
+    return response.json();
+  }
+  const transporter = nodemailer.createTransport({ host: config.email.host, port: config.email.port, secure: config.email.secure, ...(config.email.user ? { auth: { user: config.email.user, pass: config.email.password } } : {}) });
+  return transporter.sendMail(message);
+}
+
 const sendPasswordReset = async ({ email, name, resetUrl }) => {
-  const transporter = nodemailer.createTransport({
-    host: config.email.host,
-    port: config.email.port,
-    secure: config.email.secure,
-    ...(config.email.user ? { auth: { user: config.email.user, pass: config.email.password } } : {}),
-  });
-  return transporter.sendMail({
+  return sendMail({
     from: config.email.from,
     to: email,
     subject: 'Reset your LifeNet password',
@@ -18,13 +26,7 @@ const sendPasswordReset = async ({ email, name, resetUrl }) => {
 };
 
 const sendEmailVerification = async ({ email, name, verificationUrl }) => {
-  const transporter = nodemailer.createTransport({
-    host: config.email.host,
-    port: config.email.port,
-    secure: config.email.secure,
-    ...(config.email.user ? { auth: { user: config.email.user, pass: config.email.password } } : {}),
-  });
-  return transporter.sendMail({
+  return sendMail({
     from: config.email.from,
     to: email,
     subject: 'Verify your LifeNet email',
