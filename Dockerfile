@@ -10,7 +10,7 @@ RUN npm install --prefix client --no-audit --no-fund
 
 COPY server ./server
 COPY client ./client
-RUN npm run build --prefix client && mkdir -p server/public && cp -a client/dist/. server/public/ && npm prune --omit=dev --prefix client
+RUN npm run build --prefix client -- --outDir ../server/public --emptyOutDir && npm prune --omit=dev --prefix client
 
 ENV NODE_ENV=production
 EXPOSE 5000

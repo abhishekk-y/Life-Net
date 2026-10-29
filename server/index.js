@@ -111,11 +111,21 @@ app.use('/api/suppliers', suppliersRoutes);
 // In production, serve the built client and API from the same origin. This
 // keeps cookie authentication and Socket.IO on one host without extra CORS setup.
 const clientBuildPath = path.join(__dirname, 'public');
-if (config.nodeEnv === 'production' && fs.existsSync(path.join(clientBuildPath, 'index.html'))) {
-  app.use(express.static(clientBuildPath, { index: false, maxAge: '1d' }));
+if (config.nodeEnv === 'production') {
+  const clientIndexPath = path.join(clientBuildPath, 'index.html');
+  if (fs.existsSync(clientIndexPath)) {
+    app.use(express.static(clientBuildPath, { index: false, maxAge: '1d' }));
+  } else {
+    logger.error(`Built client entry is missing at ${clientIndexPath}`);
+  }
+  app.get('/', (req, res, next) => {
+    if (!fs.existsSync(clientIndexPath)) return res.status(503).send('LifeNet web client is unavailable.');
+    return res.sendFile(clientIndexPath, (error) => error && next(error));
+  });
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) return next();
-    return res.sendFile(path.join(clientBuildPath, 'index.html'));
+    if (!fs.existsSync(clientIndexPath)) return res.status(503).send('LifeNet web client is unavailable.');
+    return res.sendFile(clientIndexPath, (error) => error && next(error));
   });
 }
 
