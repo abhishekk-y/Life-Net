@@ -6,7 +6,7 @@ COPY server/package.json server/package-lock.json ./server/
 RUN npm ci --omit=dev --prefix server
 
 COPY client/package.json client/package-lock.json ./client/
-RUN npm ci --prefix client
+RUN npm install --prefix client --no-audit --no-fund
 
 COPY server ./server
 COPY client ./client
