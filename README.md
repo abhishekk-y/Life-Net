@@ -52,9 +52,11 @@ Provider approval is an in-app review of submitted information. LifeNet does not
 
 ### 1. Create a hosted MongoDB database
 
-Use the MongoDB Atlas web console (or another managed MongoDB service that supports replica-set transactions):
+Use the [MongoDB Atlas setup guide](docs/ATLAS_SETUP.md) for the exact console steps. The Atlas organization currently shows no projects, so create a project before creating a database deployment. LifeNet uses MongoDB transactions; use a transaction-capable Atlas deployment.
 
-1. Create a database project and cluster for LifeNet.
+The required sequence is:
+
+1. Create an Atlas project and database deployment for LifeNet.
 2. Create a dedicated database user for this application. Use a unique password and grant only the access needed by the application database.
 3. In Network Access, allow your development machine’s current IP address. For a hosted deployment, allow the hosting service’s documented outbound addresses or use an appropriate private network. Avoid opening database access to every IP address for production.
 4. Choose **Connect → Drivers** and copy the MongoDB connection string. Set the database name to `lifenet` and replace the password placeholder. URL-encode special characters in the database password.
