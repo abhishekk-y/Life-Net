@@ -218,7 +218,7 @@ Never put secrets in variables prefixed with `VITE_`: Vite embeds them into brow
 
 ### Render
 
-The repository includes [`render.yaml`](render.yaml). In Render, create a Blueprint from this GitHub repository and supply the environment values marked as manual:
+The repository includes [`render.yaml`](render.yaml) on Render's free compute plan for a public preview. Render free web services can spin down after inactivity and Render does not recommend them for production; use a paid compute plan before relying on the service for public production traffic. In Render, create a Blueprint from this GitHub repository and supply the environment values marked as manual:
 
 1. `MONGO_URI`: the private MongoDB Atlas connection string. Configure Atlas network access for the hosting environment before deploying.
 2. `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`: values from your email provider. LifeNet requires a sender and host in production.
