@@ -18,6 +18,17 @@ This repository contains a working MVP and its deployment configuration. It is n
 | Operations | Recipient-scoped in-app notifications, audit records for selected workflows, role-aware dashboards, and admin analytics |
 | Interface | Responsive React application with role-specific navigation, account screens, dashboard pages, and operational workflows |
 
+#### Scope snapshot
+
+This chart counts the eight groups in the implementation table against the 14 capability areas listed in the roadmap. It is a count of listed scope items, not a project-completion percentage or an estimate of effort.
+
+```mermaid
+pie showData
+    title Scope groups listed in this README
+    "Implemented MVP groups" : 8
+    "Roadmap capability areas" : 14
+```
+
 ### In the project brief, not yet implemented
 
 The brief describes a wider platform than this MVP. The following capabilities need separate implementation and review before they can be offered: telehealth/video consultations; digital prescriptions; patient health records and document storage; laboratory discovery, booking, and results; insurance workflows; hospital discovery beyond the current provider/admin directory; donor-interest registration and donation-camp management; SMS reminders; reviews and support tickets; maps and directions; multilingual content; and AI-assisted navigation. The current medicine workflow supports participating listings and pickup orders; it does not recommend substitutions or establish therapeutic equivalence. Online payments are not implemented.
@@ -48,6 +59,50 @@ Provider approval is an in-app review of submitted information. LifeNet does not
 - **Live updates:** Socket.IO authenticates connections and sends recipient-scoped notifications and limited role-level operational events.
 - **Hosting:** Render Blueprint and Docker image configuration are included. The app can serve the built client and API from one origin.
 
+### Application and database flow
+
+```mermaid
+flowchart LR
+    Browser["React web app"] -->|HTTPS / JSON| API["Express API"]
+    Browser -->|authenticated live events| Socket["Socket.IO"]
+    Socket --> API
+    API --> Models["Mongoose models and validation"]
+    Models -->|TLS using private MONGO_URI| Atlas[("MongoDB Atlas replica set")]
+    Atlas -->|connection state| Health["GET /api/health"]
+    API -->|transactions for coordinated updates| Atlas
+```
+
+The browser never connects directly to MongoDB. Keep the connection string in the API environment only. Multi-record workflows require an Atlas deployment that supports replica-set transactions.
+
+### Core data relationships
+
+```mermaid
+erDiagram
+    USER ||--o| DOCTOR_PROFILE : has
+    USER ||--o{ APPOINTMENT_SLOT : publishes
+    USER ||--o{ APPOINTMENT : patient
+    USER ||--o{ APPOINTMENT : doctor
+    APPOINTMENT_SLOT ||--o| APPOINTMENT : reserves
+    USER ||--o{ BLOOD_UNIT : manages
+    USER ||--o{ ORGAN : manages
+    USER ||--o{ REQUEST : requests
+    USER ||--o{ REQUEST : fulfills
+    USER ||--o{ PHARMACY_LISTING : publishes
+    PHARMACY_LISTING ||--o{ PHARMACY_ORDER : ordered
+    USER ||--o{ PHARMACY_ORDER : patient
+    USER ||--o{ PHARMACY_ORDER : pharmacy
+    USER ||--o{ SUPPLIER_LISTING : publishes
+    SUPPLIER_LISTING ||--o{ SUPPLY_ORDER : ordered
+    USER ||--o{ SUPPLY_ORDER : buyer
+    USER ||--o{ SUPPLY_ORDER : supplier
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ AUDIT_LOG : performs
+    BLOOD_UNIT o|--o{ REQUEST : may_match
+    ORGAN o|--o{ REQUEST : may_match
+```
+
+The diagram shows the main Mongoose references, not every field or validation rule. `Request` can refer to either a blood unit or an organ through a polymorphic resource reference. Appointment slots are uniquely reserved; order and request status changes retain history where implemented.
+
 ## Get started
 
 ### 1. Create a hosted MongoDB database
@@ -61,6 +116,14 @@ The required sequence is:
 3. In Network Access, allow your development machine’s current IP address. For a hosted deployment, allow the hosting service’s documented outbound addresses or use an appropriate private network. Avoid opening database access to every IP address for production.
 4. Choose **Connect → Drivers** and copy the MongoDB connection string. Set the database name to `lifenet` and replace the password placeholder. URL-encode special characters in the database password.
 5. Keep the connection string private. Do not paste it into source files, screenshots, issues, or commits.
+
+The URI belongs in the server's private environment as `MONGO_URI`. Its shape is:
+
+```text
+mongodb+srv://<database-user>:<URL-encoded-password>@<atlas-host>/lifenet?retryWrites=true&w=majority
+```
+
+This is a redacted format example. Never replace the placeholders in this README with real credentials. Use `server/.env` for local development and the hosting provider's private environment settings for deployment.
 
 ### 2. Configure the API
 
