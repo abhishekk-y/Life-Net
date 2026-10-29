@@ -64,7 +64,7 @@ const createOrder = asyncHandler(async (req, res) => {
     await session.withTransaction(async () => {
       const listing = await PharmacyListing.findOneAndUpdate(
         { _id: req.body.listingId, active: true, stockQuantity: { $gte: req.body.quantity }, $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }] },
-        { $inc: { stockQuantity: -req.body.quantity } }, { new: true, session }
+        { $inc: { stockQuantity: -req.body.quantity }, $set: { updatedStockAt: new Date() } }, { new: true, session }
       );
       if (!listing) throw ApiError.conflict('This pharmacy no longer has that quantity in stock. Refresh the results and try again.');
       [order] = await PharmacyOrder.create([{
@@ -126,7 +126,11 @@ const updateOrder = asyncHandler(async (req, res) => {
       );
       if (!updated) throw ApiError.conflict('This order has already changed or cannot move to that status.');
       if (action === 'CANCELLED') {
-        const listing = await PharmacyListing.findByIdAndUpdate(updated.listing, { $inc: { stockQuantity: updated.quantity } }, { new: true, session });
+        const listing = await PharmacyListing.findByIdAndUpdate(
+          updated.listing,
+          { $inc: { stockQuantity: updated.quantity }, $set: { updatedStockAt: new Date() } },
+          { new: true, session }
+        );
         if (!listing) throw ApiError.conflict('The pharmacy listing no longer exists; cancellation was not applied. Contact an administrator.');
       }
     });

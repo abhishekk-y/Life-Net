@@ -13,7 +13,7 @@ This repository contains a working MVP and its deployment configuration. It is n
 | Hospital discovery | Signed-in users can search the approved hospital directory by organization/name and location |
 | Blood coordination | Blood banks manage reported inventory; hospitals create requests; authorized centers review and reserve stock; status history tracks fulfillment |
 | Organ coordination | Procurement centers manage operational records; organizations can review a shortlist and follow a request workflow. This is not a donor-recipient allocation system |
-| Pharmacy | Pharmacies list medicine details and pickup availability; patients place pickup requests; pharmacies update order status |
+| Pharmacy | Pharmacies list medicine details and pickup availability; patients place pickup requests; pharmacies update order status; listings show stock-check time and flag reports older than 24 hours |
 | Supplier orders | Suppliers list healthcare supplies; eligible organizations request stock; suppliers process orders |
 | Operations | Recipient-scoped in-app notifications, audit records for selected workflows, role-aware dashboards, and admin analytics |
 | Interface | Responsive React application with role-specific navigation, account screens, dashboard pages, and operational workflows |

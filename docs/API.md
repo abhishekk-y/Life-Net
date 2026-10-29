@@ -62,7 +62,7 @@ Protected requests use `Authorization: Bearer <access_token>`. Sign-in also issu
 
 | Method | Path | Access |
 | --- | --- | --- |
-| GET | `/pharmacies/listings` | Signed-in user |
+| GET | `/pharmacies/listings` | Signed-in user; only active, in-stock, unexpired listings; includes last stock-check time |
 | GET | `/pharmacies/listings/mine` | Pharmacy |
 | POST, PUT | `/pharmacies/listings` or `/pharmacies/listings/:id` | Pharmacy |
 | GET | `/pharmacies/orders` | Patient’s or pharmacy’s orders; admin can review all |
